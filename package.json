@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write --list-different .",
     "preview": "vite preview",
     "test": "vitest",
     "coverage": "vitest run --coverage"
