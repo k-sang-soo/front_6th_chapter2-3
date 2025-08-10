@@ -1,3 +1,19 @@
+/**
+ * 📚 PostsManagerPage.tsx - 리팩토링 학습용 레거시 코드
+ * 
+ * 🚨 현재 상태: 726줄의 거대한 모놀리식 컴포넌트 (안티패턴)
+ * 
+ * 주요 문제점들:
+ * 1. 하나의 컴포넌트가 너무 많은 책임을 가짐 (SRP 위반)
+ * 2. 17개의 상태 변수가 무질서하게 관리됨
+ * 3. 비즈니스 로직과 UI 로직이 섞임
+ * 4. 적절한 TypeScript 타이핑 부족
+ * 5. 재사용 불가능한 구조
+ * 
+ * 🎯 학습 목표: 이 코드를 FSD 아키텍처로 리팩토링하면서
+ * 관심사 분리, 상태 관리, 컴포넌트 분해 원칙을 익히기
+ */
+
 import { useEffect, useState } from 'react';
 import { Edit2, MessageSquare, Plus, Search, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -31,31 +47,46 @@ const PostsManager = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
-  // 상태 관리
-  const [posts, setPosts] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [skip, setSkip] = useState(parseInt(queryParams.get('skip') || '0'));
-  const [limit, setLimit] = useState(parseInt(queryParams.get('limit') || '10'));
-  const [searchQuery, setSearchQuery] = useState(queryParams.get('search') || '');
-  const [selectedPost, setSelectedPost] = useState(null);
-  const [sortBy, setSortBy] = useState(queryParams.get('sortBy') || '');
-  const [sortOrder, setSortOrder] = useState(queryParams.get('sortOrder') || 'asc');
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [newPost, setNewPost] = useState({ title: '', body: '', userId: 1 });
-  const [loading, setLoading] = useState(false);
-  const [tags, setTags] = useState([]);
-  const [selectedTag, setSelectedTag] = useState(queryParams.get('tag') || '');
-  const [comments, setComments] = useState({});
-  const [selectedComment, setSelectedComment] = useState(null);
-  const [newComment, setNewComment] = useState({ body: '', postId: null, userId: 1 });
-  const [showAddCommentDialog, setShowAddCommentDialog] = useState(false);
-  const [showEditCommentDialog, setShowEditCommentDialog] = useState(false);
-  const [showPostDetailDialog, setShowPostDetailDialog] = useState(false);
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
+  // === 상태 관리 === //
+  
+  // 게시물 목록과 관련된 서버 데이터
+  const [posts, setPosts] = useState([]); // 현재 화면에 표시되는 게시물 목록
+  const [total, setTotal] = useState(0); // 전체 게시물 개수 (페이지네이션용)
+  const [loading, setLoading] = useState(false); // API 호출 중인지 표시
+  const [tags, setTags] = useState([]); // 사용 가능한 모든 태그 목록
+  const [comments, setComments] = useState({}); // 각 게시물별 댓글 저장 객체
+  
+  // 페이지네이션, 검색, 정렬을 위한 필터 상태
+  const [skip, setSkip] = useState(parseInt(queryParams.get('skip') || '0')); // 페이지네이션: 건너뛸 항목 수
+  const [limit, setLimit] = useState(parseInt(queryParams.get('limit') || '10')); // 페이지네이션: 페이지당 항목 수
+  const [searchQuery, setSearchQuery] = useState(queryParams.get('search') || ''); // 검색어
+  const [sortBy, setSortBy] = useState(queryParams.get('sortBy') || ''); // 정렬 기준 (id, title, reactions)
+  const [sortOrder, setSortOrder] = useState(queryParams.get('sortOrder') || 'asc'); // 정렬 순서 (오름차순/내림차순)
+  const [selectedTag, setSelectedTag] = useState(queryParams.get('tag') || ''); // 선택된 태그 필터
+  
+  // 현재 선택/편집 중인 항목들
+  const [selectedPost, setSelectedPost] = useState(null); // 상세보기나 수정할 게시물
+  const [selectedComment, setSelectedComment] = useState(null); // 수정할 댓글
+  const [selectedUser, setSelectedUser] = useState(null); // 프로필을 볼 사용자
+  
+  // 새로 작성 중인 데이터 (폼 상태)
+  const [newPost, setNewPost] = useState({ title: '', body: '', userId: 1 }); // 새 게시물 작성 폼
+  const [newComment, setNewComment] = useState({ body: '', postId: null, userId: 1 }); // 새 댓글 작성 폼
+  
+  // UI 모달/다이얼로그 표시 여부 제어
+  const [showAddDialog, setShowAddDialog] = useState(false); // 게시물 추가 다이얼로그
+  const [showEditDialog, setShowEditDialog] = useState(false); // 게시물 수정 다이얼로그
+  const [showAddCommentDialog, setShowAddCommentDialog] = useState(false); // 댓글 추가 다이얼로그
+  const [showEditCommentDialog, setShowEditCommentDialog] = useState(false); // 댓글 수정 다이얼로그
+  const [showPostDetailDialog, setShowPostDetailDialog] = useState(false); // 게시물 상세보기 다이얼로그
+  const [showUserModal, setShowUserModal] = useState(false); // 사용자 정보 모달
 
-  // URL 업데이트 함수
+  // === 유틸리티 함수 === //
+  
+  /**
+   * 현재 필터 상태를 URL 파라미터로 변환하여 브라우저 주소창에 반영
+   * 페이지 새로고침이나 뒤로가기 시에도 필터 상태가 유지됨
+   */
   const updateURL = () => {
     const params = new URLSearchParams();
     if (skip) params.set('skip', skip.toString());
@@ -67,7 +98,14 @@ const PostsManager = () => {
     navigate(`?${params.toString()}`);
   };
 
-  // 게시물 가져오기
+  // === API 호출 함수들 === //
+  
+  /**
+   * 게시물 목록을 가져오는 함수
+   * 1. 게시물 데이터를 페이지네이션과 함께 가져옴
+   * 2. 사용자 데이터를 별도로 가져옴 (username, image만)
+   * 3. 게시물에 작성자 정보를 결합해서 화면에 표시
+   */
   const fetchPosts = () => {
     setLoading(true);
     let postsData;
@@ -97,7 +135,9 @@ const PostsManager = () => {
       });
   };
 
-  // 태그 가져오기
+  /**
+   * 사용 가능한 모든 태그 목록을 가져와서 필터 드롭다운에 표시
+   */
   const fetchTags = async () => {
     try {
       const response = await fetch('/api/posts/tags');
@@ -108,7 +148,10 @@ const PostsManager = () => {
     }
   };
 
-  // 게시물 검색
+  /**
+   * 검색어로 게시물을 찾는 함수
+   * 검색어가 비어있으면 전체 게시물을 다시 불러옴
+   */
   const searchPosts = async () => {
     if (!searchQuery) {
       fetchPosts();
@@ -126,7 +169,10 @@ const PostsManager = () => {
     setLoading(false);
   };
 
-  // 태그별 게시물 가져오기
+  /**
+   * 특정 태그로 필터링된 게시물을 가져오는 함수
+   * 태그가 'all'이거나 없으면 전체 게시물을 불러옴
+   */
   const fetchPostsByTag = async (tag) => {
     if (!tag || tag === 'all') {
       fetchPosts();
@@ -154,7 +200,12 @@ const PostsManager = () => {
     setLoading(false);
   };
 
-  // 게시물 추가
+  // === 게시물 CRUD 함수들 === //
+
+  /**
+   * 새 게시물을 생성하는 함수
+   * 성공하면 목록 맨 앞에 추가하고 작성 다이얼로그를 닫음
+   */
   const addPost = async () => {
     try {
       const response = await fetch('/api/posts/add', {
@@ -171,7 +222,10 @@ const PostsManager = () => {
     }
   };
 
-  // 게시물 업데이트
+  /**
+   * 선택된 게시물을 수정하는 함수
+   * 성공하면 목록에서 해당 게시물을 업데이트하고 수정 다이얼로그를 닫음
+   */
   const updatePost = async () => {
     try {
       const response = await fetch(`/api/posts/${selectedPost.id}`, {
@@ -187,7 +241,10 @@ const PostsManager = () => {
     }
   };
 
-  // 게시물 삭제
+  /**
+   * 게시물을 삭제하는 함수
+   * 성공하면 목록에서 해당 게시물을 제거
+   */
   const deletePost = async (id) => {
     try {
       await fetch(`/api/posts/${id}`, {
@@ -199,9 +256,14 @@ const PostsManager = () => {
     }
   };
 
-  // 댓글 가져오기
+  // === 댓글 관련 함수들 === //
+
+  /**
+   * 특정 게시물의 댓글을 가져오는 함수
+   * 이미 불러온 댓글이 있으면 중복 호출을 방지함 (캐시 역할)
+   */
   const fetchComments = async (postId) => {
-    if (comments[postId]) return; // 이미 불러온 댓글이 있으면 다시 불러오지 않음
+    if (comments[postId]) return; // 중복 호출 방지
     try {
       const response = await fetch(`/api/comments/post/${postId}`);
       const data = await response.json();
@@ -211,7 +273,10 @@ const PostsManager = () => {
     }
   };
 
-  // 댓글 추가
+  /**
+   * 새 댓글을 추가하는 함수
+   * 성공하면 해당 게시물의 댓글 목록에 추가하고 작성 폼을 초기화
+   */
   const addComment = async () => {
     try {
       const response = await fetch('/api/comments/add', {
@@ -231,7 +296,10 @@ const PostsManager = () => {
     }
   };
 
-  // 댓글 업데이트
+  /**
+   * 선택된 댓글을 수정하는 함수
+   * 성공하면 댓글 목록에서 해당 댓글을 업데이트
+   */
   const updateComment = async () => {
     try {
       const response = await fetch(`/api/comments/${selectedComment.id}`, {
@@ -252,7 +320,10 @@ const PostsManager = () => {
     }
   };
 
-  // 댓글 삭제
+  /**
+   * 댓글을 삭제하는 함수
+   * 성공하면 해당 게시물의 댓글 목록에서 제거
+   */
   const deleteComment = async (id, postId) => {
     try {
       await fetch(`/api/comments/${id}`, {
@@ -267,7 +338,10 @@ const PostsManager = () => {
     }
   };
 
-  // 댓글 좋아요
+  /**
+   * 댓글에 좋아요를 추가하는 함수
+   * 현재 좋아요 수에 1을 더해서 서버에 업데이트
+   */
   const likeComment = async (id, postId) => {
     try {
       const response = await fetch(`/api/comments/${id}`, {
@@ -287,14 +361,22 @@ const PostsManager = () => {
     }
   };
 
-  // 게시물 상세 보기
+  // === UI 상호작용 함수들 === //
+
+  /**
+   * 게시물 상세보기 다이얼로그를 여는 함수
+   * 선택된 게시물을 설정하고 해당 게시물의 댓글을 불러온 후 다이얼로그 표시
+   */
   const openPostDetail = (post) => {
     setSelectedPost(post);
     fetchComments(post.id);
     setShowPostDetailDialog(true);
   };
 
-  // 사용자 모달 열기
+  /**
+   * 사용자 정보 모달을 여는 함수
+   * 사용자의 상세 정보를 API로 가져온 후 모달에 표시
+   */
   const openUserModal = async (user) => {
     try {
       const response = await fetch(`/api/users/${user.id}`);
@@ -306,10 +388,15 @@ const PostsManager = () => {
     }
   };
 
+  // 🚨 문제점 #3: useEffect 의존성 관리 문제 + 복잡한 사이드 이펙트
+  // 👉 개선 방향: 커스텀 훅으로 분리하고 의존성을 명확히 관리
+  
+  // 초기 태그 로딩
   useEffect(() => {
     fetchTags();
-  }, []);
+  }, []); // ✅ 의존성 없음 - 한 번만 실행
 
+  // 🔄 필터/페이지 변경 시 데이터 리로딩 + URL 동기화
   useEffect(() => {
     if (selectedTag) {
       fetchPostsByTag(selectedTag);
@@ -317,8 +404,11 @@ const PostsManager = () => {
       fetchPosts();
     }
     updateURL();
-  }, [skip, limit, sortBy, sortOrder, selectedTag]);
-
+  }, [skip, limit, sortBy, sortOrder, selectedTag]); 
+  // 🚨 문제: fetchPosts, fetchPostsByTag, updateURL이 의존성에 없음!
+  // ESLint exhaustive-deps 규칙 위반
+  
+  // 🌐 URL 파라미터를 상태로 동기화 (브라우저 뒤로가기 대응)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     setSkip(parseInt(params.get('skip') || '0'));
@@ -327,7 +417,7 @@ const PostsManager = () => {
     setSortBy(params.get('sortBy') || '');
     setSortOrder(params.get('sortOrder') || 'asc');
     setSelectedTag(params.get('tag') || '');
-  }, [location.search]);
+  }, [location.search]); // ✅ location.search 의존성만 필요
 
   // 하이라이트 함수 추가
   const highlightText = (text: string, highlight: string) => {

@@ -1,3 +1,9 @@
+/**
+ * 애플리케이션 상단 헤더 컴포넌트
+ * - 앱 제목과 로고를 표시
+ * - 네비게이션 메뉴 제공 (홈, 대시보드, 설정)
+ * - 반응형 레이아웃으로 구성
+ */
 import React from 'react';
 import { MessageSquare } from 'lucide-react';
 

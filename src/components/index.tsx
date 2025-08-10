@@ -1,3 +1,10 @@
+/**
+ * 공통 UI 컴포넌트 라이브러리
+ * - Radix UI 기반의 접근성 높은 컴포넌트들
+ * - Button, Input, Card, Table, Dialog, Select 등 제공
+ * - Tailwind CSS로 스타일링
+ * - class-variance-authority로 variant 시스템 구현
+ */
 import * as React from 'react';
 import { forwardRef } from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
