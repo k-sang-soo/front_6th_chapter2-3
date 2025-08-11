@@ -1,6 +1,6 @@
-import { HTMLAttributes, Ref } from 'react';
+import { TextareaHTMLAttributes, Ref } from 'react';
 
-interface TextareaProps extends HTMLAttributes<HTMLTextAreaElement> {
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   ref?: Ref<HTMLTextAreaElement>;
   className?: string;
 }
