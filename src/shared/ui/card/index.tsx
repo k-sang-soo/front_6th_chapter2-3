@@ -39,7 +39,7 @@ CardContent.displayName = 'CardContent';
 
 interface CardTitleProps extends HTMLAttributes<HTMLHeadingElement> {
   ref?: Ref<HTMLHeadingElement>;
-  classname?: string;
+  className?: string;
 }
 
 export const CardTitle = ({ ref, className, ...props }: CardTitleProps) => {
