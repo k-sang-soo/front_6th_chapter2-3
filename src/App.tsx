@@ -6,20 +6,15 @@
  * - 현재는 PostsManagerPage만 렌더링 (단일 페이지 구조)
  */
 import { BrowserRouter as Router } from 'react-router-dom';
-import Header from './components/Header.tsx';
-import Footer from './components/Footer.tsx';
 import PostsManagerPage from './pages/PostsManagerPage.tsx';
+import { DefaultLayout } from './widgets/ui/layout';
 
 const App = () => {
   return (
     <Router>
-      <div className="flex flex-col min-h-screen">
-        <Header />
-        <main className="flex-grow container mx-auto px-4 py-8">
-          <PostsManagerPage />
-        </main>
-        <Footer />
-      </div>
+      <DefaultLayout>
+        <PostsManagerPage />
+      </DefaultLayout>
     </Router>
   );
 };
