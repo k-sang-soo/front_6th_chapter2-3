@@ -1,15 +1,15 @@
 /**
  * 📚 PostsManagerPage.tsx - 리팩토링 학습용 레거시 코드
- * 
+ *
  * 🚨 현재 상태: 726줄의 거대한 모놀리식 컴포넌트 (안티패턴)
- * 
+ *
  * 주요 문제점들:
  * 1. 하나의 컴포넌트가 너무 많은 책임을 가짐 (SRP 위반)
  * 2. 17개의 상태 변수가 무질서하게 관리됨
  * 3. 비즈니스 로직과 UI 로직이 섞임
  * 4. 적절한 TypeScript 타이핑 부족
  * 5. 재사용 불가능한 구조
- * 
+ *
  * 🎯 학습 목표: 이 코드를 FSD 아키텍처로 리팩토링하면서
  * 관심사 분리, 상태 관리, 컴포넌트 분해 원칙을 익히기
  */
@@ -40,7 +40,7 @@ import {
   TableHeader,
   TableRow,
   Textarea,
-} from '../components';
+} from '../shared/ui';
 
 const PostsManager = () => {
   const navigate = useNavigate();
@@ -48,14 +48,14 @@ const PostsManager = () => {
   const queryParams = new URLSearchParams(location.search);
 
   // === 상태 관리 === //
-  
+
   // 게시물 목록과 관련된 서버 데이터
   const [posts, setPosts] = useState([]); // 현재 화면에 표시되는 게시물 목록
   const [total, setTotal] = useState(0); // 전체 게시물 개수 (페이지네이션용)
   const [loading, setLoading] = useState(false); // API 호출 중인지 표시
   const [tags, setTags] = useState([]); // 사용 가능한 모든 태그 목록
   const [comments, setComments] = useState({}); // 각 게시물별 댓글 저장 객체
-  
+
   // 페이지네이션, 검색, 정렬을 위한 필터 상태
   const [skip, setSkip] = useState(parseInt(queryParams.get('skip') || '0')); // 페이지네이션: 건너뛸 항목 수
   const [limit, setLimit] = useState(parseInt(queryParams.get('limit') || '10')); // 페이지네이션: 페이지당 항목 수
@@ -63,16 +63,16 @@ const PostsManager = () => {
   const [sortBy, setSortBy] = useState(queryParams.get('sortBy') || ''); // 정렬 기준 (id, title, reactions)
   const [sortOrder, setSortOrder] = useState(queryParams.get('sortOrder') || 'asc'); // 정렬 순서 (오름차순/내림차순)
   const [selectedTag, setSelectedTag] = useState(queryParams.get('tag') || ''); // 선택된 태그 필터
-  
+
   // 현재 선택/편집 중인 항목들
   const [selectedPost, setSelectedPost] = useState(null); // 상세보기나 수정할 게시물
   const [selectedComment, setSelectedComment] = useState(null); // 수정할 댓글
   const [selectedUser, setSelectedUser] = useState(null); // 프로필을 볼 사용자
-  
+
   // 새로 작성 중인 데이터 (폼 상태)
   const [newPost, setNewPost] = useState({ title: '', body: '', userId: 1 }); // 새 게시물 작성 폼
   const [newComment, setNewComment] = useState({ body: '', postId: null, userId: 1 }); // 새 댓글 작성 폼
-  
+
   // UI 모달/다이얼로그 표시 여부 제어
   const [showAddDialog, setShowAddDialog] = useState(false); // 게시물 추가 다이얼로그
   const [showEditDialog, setShowEditDialog] = useState(false); // 게시물 수정 다이얼로그
@@ -82,7 +82,7 @@ const PostsManager = () => {
   const [showUserModal, setShowUserModal] = useState(false); // 사용자 정보 모달
 
   // === 유틸리티 함수 === //
-  
+
   /**
    * 현재 필터 상태를 URL 파라미터로 변환하여 브라우저 주소창에 반영
    * 페이지 새로고침이나 뒤로가기 시에도 필터 상태가 유지됨
@@ -99,7 +99,7 @@ const PostsManager = () => {
   };
 
   // === API 호출 함수들 === //
-  
+
   /**
    * 게시물 목록을 가져오는 함수
    * 1. 게시물 데이터를 페이지네이션과 함께 가져옴
@@ -111,7 +111,7 @@ const PostsManager = () => {
     let postsData;
     let usersData;
 
-    fetch(`/api/posts?limit=${limit}&skip=${skip}`)
+    fetch(`/api/posts?limit=${limit}&skip=${skip}&`)
       .then((response) => response.json())
       .then((data) => {
         postsData = data;
@@ -390,7 +390,7 @@ const PostsManager = () => {
 
   // 🚨 문제점 #3: useEffect 의존성 관리 문제 + 복잡한 사이드 이펙트
   // 👉 개선 방향: 커스텀 훅으로 분리하고 의존성을 명확히 관리
-  
+
   // 초기 태그 로딩
   useEffect(() => {
     fetchTags();
@@ -404,10 +404,10 @@ const PostsManager = () => {
       fetchPosts();
     }
     updateURL();
-  }, [skip, limit, sortBy, sortOrder, selectedTag]); 
+  }, [skip, limit, sortBy, sortOrder, selectedTag]);
   // 🚨 문제: fetchPosts, fetchPostsByTag, updateURL이 의존성에 없음!
   // ESLint exhaustive-deps 규칙 위반
-  
+
   // 🌐 URL 파라미터를 상태로 동기화 (브라우저 뒤로가기 대응)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
