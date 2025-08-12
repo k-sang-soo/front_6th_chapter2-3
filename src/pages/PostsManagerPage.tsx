@@ -41,6 +41,10 @@ import {
   TableRow,
   Textarea,
 } from '../shared/ui';
+import { Post, PostFormData, PostsResponse, PostWithAuthor } from '../entities/post/model/types.ts';
+import { UserProfile, UsersResponse } from '../entities/user/model/types.ts';
+import { Tag, TagFilterOption } from '../entities/tag/model/types.ts';
+import { Comment, CommentFormData, CommentsResponse } from '../entities/comment/model/types.ts';
 
 const PostsManager = () => {
   const navigate = useNavigate();
@@ -50,11 +54,15 @@ const PostsManager = () => {
   // === 상태 관리 === //
 
   // 게시물 목록과 관련된 서버 데이터
-  const [posts, setPosts] = useState([]); // 현재 화면에 표시되는 게시물 목록
+  const [posts, setPosts] = useState<PostWithAuthor[]>([]); // 현재 화면에 표시되는 게시물 목록
   const [total, setTotal] = useState(0); // 전체 게시물 개수 (페이지네이션용)
   const [loading, setLoading] = useState(false); // API 호출 중인지 표시
-  const [tags, setTags] = useState([]); // 사용 가능한 모든 태그 목록
-  const [comments, setComments] = useState({}); // 각 게시물별 댓글 저장 객체
+  const [tags, setTags] = useState<Tag[]>([]); // 사용 가능한 모든 태그 목록
+  const [comments, setComments] = useState<Comment[]>([]); // 각 게시물별 댓글 저장 객체
+
+  useEffect(() => {
+    console.log('comments', comments);
+  }, [comments]);
 
   // 페이지네이션, 검색, 정렬을 위한 필터 상태
   const [skip, setSkip] = useState(parseInt(queryParams.get('skip') || '0')); // 페이지네이션: 건너뛸 항목 수
@@ -65,13 +73,17 @@ const PostsManager = () => {
   const [selectedTag, setSelectedTag] = useState(queryParams.get('tag') || ''); // 선택된 태그 필터
 
   // 현재 선택/편집 중인 항목들
-  const [selectedPost, setSelectedPost] = useState(null); // 상세보기나 수정할 게시물
-  const [selectedComment, setSelectedComment] = useState(null); // 수정할 댓글
-  const [selectedUser, setSelectedUser] = useState(null); // 프로필을 볼 사용자
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null); // 상세보기나 수정할 게시물
+  const [selectedComment, setSelectedComment] = useState<Comment | null>(null); // 수정할 댓글
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null); // 프로필을 볼 사용자
 
   // 새로 작성 중인 데이터 (폼 상태)
-  const [newPost, setNewPost] = useState({ title: '', body: '', userId: 1 }); // 새 게시물 작성 폼
-  const [newComment, setNewComment] = useState({ body: '', postId: null, userId: 1 }); // 새 댓글 작성 폼
+  const [newPost, setNewPost] = useState<PostFormData>({ title: '', body: '', userId: 1 }); // 새 게시물 작성 폼
+  const [newComment, setNewComment] = useState<CommentFormData>({
+    body: '',
+    postId: 1,
+    userId: 1,
+  }); // 새 댓글 작성 폼
 
   // UI 모달/다이얼로그 표시 여부 제어
   const [showAddDialog, setShowAddDialog] = useState(false); // 게시물 추가 다이얼로그
@@ -108,21 +120,21 @@ const PostsManager = () => {
    */
   const fetchPosts = () => {
     setLoading(true);
-    let postsData;
-    let usersData;
+    let postsData: PostsResponse;
+    let usersData: UsersResponse;
 
     fetch(`/api/posts?limit=${limit}&skip=${skip}&`)
       .then((response) => response.json())
-      .then((data) => {
+      .then((data: PostsResponse) => {
         postsData = data;
         return fetch('/api/users?limit=0&select=username,image');
       })
       .then((response) => response.json())
-      .then((users) => {
-        usersData = users.users;
+      .then((users: UsersResponse) => {
+        usersData = users;
         const postsWithUsers = postsData.posts.map((post) => ({
           ...post,
-          author: usersData.find((user) => user.id === post.userId),
+          author: usersData.users.find((user) => user.id === post.userId),
         }));
         setPosts(postsWithUsers);
         setTotal(postsData.total);
@@ -141,7 +153,7 @@ const PostsManager = () => {
   const fetchTags = async () => {
     try {
       const response = await fetch('/api/posts/tags');
-      const data = await response.json();
+      const data: Tag[] = await response.json();
       setTags(data);
     } catch (error) {
       console.error('태그 가져오기 오류:', error);
@@ -173,7 +185,7 @@ const PostsManager = () => {
    * 특정 태그로 필터링된 게시물을 가져오는 함수
    * 태그가 'all'이거나 없으면 전체 게시물을 불러옴
    */
-  const fetchPostsByTag = async (tag) => {
+  const fetchPostsByTag = async (tag: TagFilterOption) => {
     if (!tag || tag === 'all') {
       fetchPosts();
       return;
@@ -184,8 +196,8 @@ const PostsManager = () => {
         fetch(`/api/posts/tag/${tag}`),
         fetch('/api/users?limit=0&select=username,image'),
       ]);
-      const postsData = await postsResponse.json();
-      const usersData = await usersResponse.json();
+      const postsData: PostsResponse = await postsResponse.json();
+      const usersData: UsersResponse = await usersResponse.json();
 
       const postsWithUsers = postsData.posts.map((post) => ({
         ...post,
@@ -206,6 +218,8 @@ const PostsManager = () => {
    * 새 게시물을 생성하는 함수
    * 성공하면 목록 맨 앞에 추가하고 작성 다이얼로그를 닫음
    */
+  // userId를 생성할 때 작업자가 지정해주는 방식
+  // 존재하지 않는  userId를 생성하면??...
   const addPost = async () => {
     try {
       const response = await fetch('/api/posts/add', {
@@ -226,9 +240,9 @@ const PostsManager = () => {
    * 선택된 게시물을 수정하는 함수
    * 성공하면 목록에서 해당 게시물을 업데이트하고 수정 다이얼로그를 닫음
    */
-  const updatePost = async () => {
+  const updatePost = async (postId: Post['id']) => {
     try {
-      const response = await fetch(`/api/posts/${selectedPost.id}`, {
+      const response = await fetch(`/api/posts/${postId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(selectedPost),
@@ -245,12 +259,12 @@ const PostsManager = () => {
    * 게시물을 삭제하는 함수
    * 성공하면 목록에서 해당 게시물을 제거
    */
-  const deletePost = async (id) => {
+  const deletePost = async (postId: Post['id']) => {
     try {
-      await fetch(`/api/posts/${id}`, {
+      await fetch(`/api/posts/${postId}`, {
         method: 'DELETE',
       });
-      setPosts(posts.filter((post) => post.id !== id));
+      setPosts(posts.filter((post) => post.id !== postId));
     } catch (error) {
       console.error('게시물 삭제 오류:', error);
     }
@@ -262,12 +276,11 @@ const PostsManager = () => {
    * 특정 게시물의 댓글을 가져오는 함수
    * 이미 불러온 댓글이 있으면 중복 호출을 방지함 (캐시 역할)
    */
-  const fetchComments = async (postId) => {
-    if (comments[postId]) return; // 중복 호출 방지
+  const fetchComments = async (postId: Post['id']) => {
     try {
       const response = await fetch(`/api/comments/post/${postId}`);
-      const data = await response.json();
-      setComments((prev) => ({ ...prev, [postId]: data.comments }));
+      const data: CommentsResponse = await response.json();
+      setComments(data.comments);
     } catch (error) {
       console.error('댓글 가져오기 오류:', error);
     }
@@ -277,7 +290,7 @@ const PostsManager = () => {
    * 새 댓글을 추가하는 함수
    * 성공하면 해당 게시물의 댓글 목록에 추가하고 작성 폼을 초기화
    */
-  const addComment = async () => {
+  const addComment = async (newComment: CommentFormData) => {
     try {
       const response = await fetch('/api/comments/add', {
         method: 'POST',
@@ -285,12 +298,9 @@ const PostsManager = () => {
         body: JSON.stringify(newComment),
       });
       const data = await response.json();
-      setComments((prev) => ({
-        ...prev,
-        [data.postId]: [...(prev[data.postId] || []), data],
-      }));
+      setComments((prev) => [data, ...prev]);
       setShowAddCommentDialog(false);
-      setNewComment({ body: '', postId: null, userId: 1 });
+      setNewComment({ body: '', postId: 1, userId: 1 });
     } catch (error) {
       console.error('댓글 추가 오류:', error);
     }
@@ -300,20 +310,21 @@ const PostsManager = () => {
    * 선택된 댓글을 수정하는 함수
    * 성공하면 댓글 목록에서 해당 댓글을 업데이트
    */
-  const updateComment = async () => {
+  const updateComment = async (updatedId: Comment['id'], updateComment: CommentFormData) => {
+    if (!updatedId) {
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/comments/${selectedComment.id}`, {
+      const response = await fetch(`/api/comments/${updatedId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: selectedComment.body }),
+        body: JSON.stringify({ body: updateComment.body }),
       });
       const data = await response.json();
-      setComments((prev) => ({
-        ...prev,
-        [data.postId]: prev[data.postId].map((comment) =>
-          comment.id === data.id ? data : comment,
-        ),
-      }));
+      setComments((prev) => {
+        return prev.map((comment) => (comment.id === data.id ? data : comment));
+      });
       setShowEditCommentDialog(false);
     } catch (error) {
       console.error('댓글 업데이트 오류:', error);
@@ -324,15 +335,12 @@ const PostsManager = () => {
    * 댓글을 삭제하는 함수
    * 성공하면 해당 게시물의 댓글 목록에서 제거
    */
-  const deleteComment = async (id, postId) => {
+  const deleteComment = async (commentId: Comment['id']) => {
     try {
-      await fetch(`/api/comments/${id}`, {
+      await fetch(`/api/comments/${commentId}`, {
         method: 'DELETE',
       });
-      setComments((prev) => ({
-        ...prev,
-        [postId]: prev[postId].filter((comment) => comment.id !== id),
-      }));
+      setComments((prev) => prev.filter((comment) => comment.id !== commentId));
     } catch (error) {
       console.error('댓글 삭제 오류:', error);
     }
@@ -342,20 +350,26 @@ const PostsManager = () => {
    * 댓글에 좋아요를 추가하는 함수
    * 현재 좋아요 수에 1을 더해서 서버에 업데이트
    */
-  const likeComment = async (id, postId) => {
+  const likeComment = async (commentId: Comment['id']) => {
     try {
-      const response = await fetch(`/api/comments/${id}`, {
+      const targetComment = comments.find((comment) => comment.id === commentId);
+
+      if (!targetComment) {
+        console.error('댓글을 찾을 수 없습니다:', commentId);
+        return;
+      }
+
+      const response = await fetch(`/api/comments/${commentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ likes: comments[postId].find((c) => c.id === id).likes + 1 }),
+        body: JSON.stringify({
+          likes: targetComment.likes + 1,
+        }),
       });
       const data = await response.json();
-      setComments((prev) => ({
-        ...prev,
-        [postId]: prev[postId].map((comment) =>
-          comment.id === data.id ? { ...data, likes: comment.likes + 1 } : comment,
-        ),
-      }));
+      setComments((prev) => {
+        return prev.map((comment) => (comment.id === data.id ? data : comment));
+      });
     } catch (error) {
       console.error('댓글 좋아요 오류:', error);
     }
@@ -367,7 +381,7 @@ const PostsManager = () => {
    * 게시물 상세보기 다이얼로그를 여는 함수
    * 선택된 게시물을 설정하고 해당 게시물의 댓글을 불러온 후 다이얼로그 표시
    */
-  const openPostDetail = (post) => {
+  const openPostDetail = (post: Post) => {
     setSelectedPost(post);
     fetchComments(post.id);
     setShowPostDetailDialog(true);
@@ -377,10 +391,12 @@ const PostsManager = () => {
    * 사용자 정보 모달을 여는 함수
    * 사용자의 상세 정보를 API로 가져온 후 모달에 표시
    */
-  const openUserModal = async (user) => {
+  const openUserModal = async (user: PostWithAuthor['author']) => {
     try {
+      if (!user || !user.id) return;
+
       const response = await fetch(`/api/users/${user.id}`);
-      const userData = await response.json();
+      const userData: UserProfile = await response.json();
       setSelectedUser(userData);
       setShowUserModal(true);
     } catch (error) {
@@ -420,7 +436,7 @@ const PostsManager = () => {
   }, [location.search]); // ✅ location.search 의존성만 필요
 
   // 하이라이트 함수 추가
-  const highlightText = (text: string, highlight: string) => {
+  const highlightText = (text: string | undefined, highlight: string) => {
     if (!text) return null;
     if (!highlight.trim()) {
       return <span>{text}</span>;
@@ -524,52 +540,59 @@ const PostsManager = () => {
   );
 
   // 댓글 렌더링
-  const renderComments = (postId) => (
-    <div className="mt-2">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold">댓글</h3>
-        <Button
-          size="sm"
-          onClick={() => {
-            setNewComment((prev) => ({ ...prev, postId }));
-            setShowAddCommentDialog(true);
-          }}
-        >
-          <Plus className="w-3 h-3 mr-1" />
-          댓글 추가
-        </Button>
-      </div>
-      <div className="space-y-1">
-        {comments[postId]?.map((comment) => (
-          <div key={comment.id} className="flex items-center justify-between text-sm border-b pb-1">
-            <div className="flex items-center space-x-2 overflow-hidden">
-              <span className="font-medium truncate">{comment.user.username}:</span>
-              <span className="truncate">{highlightText(comment.body, searchQuery)}</span>
+  const renderComments = (postId: Post['id'] | undefined) => {
+    if (!postId) return null;
+
+    return (
+      <div className="mt-2">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold">댓글</h3>
+          <Button
+            size="sm"
+            onClick={() => {
+              setNewComment((prev) => ({ ...prev, postId }));
+              setShowAddCommentDialog(true);
+            }}
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            댓글 추가
+          </Button>
+        </div>
+        <div className="space-y-1">
+          {comments.map((comment) => (
+            <div
+              key={comment.id}
+              className="flex items-center justify-between text-sm border-b pb-1"
+            >
+              <div className="flex items-center space-x-2 overflow-hidden">
+                <span className="font-medium truncate">{comment.user.username}:</span>
+                <span className="truncate">{highlightText(comment.body, searchQuery)}</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <Button variant="ghost" size="sm" onClick={() => likeComment(comment.id)}>
+                  <ThumbsUp className="w-3 h-3" />
+                  <span className="ml-1 text-xs">{comment.likes}</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedComment(comment);
+                    setShowEditCommentDialog(true);
+                  }}
+                >
+                  <Edit2 className="w-3 h-3" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => deleteComment(comment.id)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center space-x-1">
-              <Button variant="ghost" size="sm" onClick={() => likeComment(comment.id, postId)}>
-                <ThumbsUp className="w-3 h-3" />
-                <span className="ml-1 text-xs">{comment.likes}</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedComment(comment);
-                  setShowEditCommentDialog(true);
-                }}
-              >
-                <Edit2 className="w-3 h-3" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => deleteComment(comment.id, postId)}>
-                <Trash2 className="w-3 h-3" />
-              </Button>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <Card className="w-full max-w-6xl mx-auto">
@@ -710,15 +733,28 @@ const PostsManager = () => {
             <Input
               placeholder="제목"
               value={selectedPost?.title || ''}
-              onChange={(e) => setSelectedPost({ ...selectedPost, title: e.target.value })}
+              onChange={(e) => {
+                if (!selectedPost) return;
+                setSelectedPost({ ...selectedPost, title: e.target.value });
+              }}
             />
             <Textarea
               rows={15}
               placeholder="내용"
               value={selectedPost?.body || ''}
-              onChange={(e) => setSelectedPost({ ...selectedPost, body: e.target.value })}
+              onChange={(e) => {
+                if (!selectedPost) return;
+                setSelectedPost({ ...selectedPost, body: e.target.value });
+              }}
             />
-            <Button onClick={updatePost}>게시물 업데이트</Button>
+            <Button
+              onClick={() => {
+                if (!selectedPost || !selectedPost.id) return;
+                updatePost(selectedPost.id);
+              }}
+            >
+              게시물 업데이트
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -735,7 +771,7 @@ const PostsManager = () => {
               value={newComment.body}
               onChange={(e) => setNewComment({ ...newComment, body: e.target.value })}
             />
-            <Button onClick={addComment}>댓글 추가</Button>
+            <Button onClick={() => addComment(newComment)}>댓글 추가</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -750,9 +786,19 @@ const PostsManager = () => {
             <Textarea
               placeholder="댓글 내용"
               value={selectedComment?.body || ''}
-              onChange={(e) => setSelectedComment({ ...selectedComment, body: e.target.value })}
+              onChange={(e) => {
+                if (!selectedComment) return;
+                setSelectedComment({ ...selectedComment, body: e.target.value });
+              }}
             />
-            <Button onClick={updateComment}>댓글 업데이트</Button>
+            <Button
+              onClick={() => {
+                if (!selectedComment || !selectedComment.id) return;
+                updateComment(selectedComment.id, newComment);
+              }}
+            >
+              댓글 업데이트
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
