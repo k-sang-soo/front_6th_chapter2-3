@@ -41,10 +41,11 @@ import {
   TableRow,
   Textarea,
 } from '../shared/ui';
-import { Post, PostFormData, PostsResponse, PostWithAuthor } from '../entities/post/model/types.ts';
-import { UserProfile, UsersResponse } from '../entities/user/model/types.ts';
-import { Tag, TagFilterOption } from '../entities/tag/model/types.ts';
-import { Comment, CommentFormData, CommentsResponse } from '../entities/comment/model/types.ts';
+import { Post, PostsResponse, PostWithAuthor } from '../entities/post/model';
+import { Tag, TagFilterOption } from '../entities/tag/model';
+import { UserProfile, UsersResponse } from '../entities/user/model';
+import { PostFormData } from '../entities/post/model/types.ts';
+import { Comment, CommentFormData, CommentsResponse } from '../entities/comment/model';
 
 const PostsManager = () => {
   const navigate = useNavigate();
@@ -59,10 +60,6 @@ const PostsManager = () => {
   const [loading, setLoading] = useState(false); // API 호출 중인지 표시
   const [tags, setTags] = useState<Tag[]>([]); // 사용 가능한 모든 태그 목록
   const [comments, setComments] = useState<Comment[]>([]); // 각 게시물별 댓글 저장 객체
-
-  useEffect(() => {
-    console.log('comments', comments);
-  }, [comments]);
 
   // 페이지네이션, 검색, 정렬을 위한 필터 상태
   const [skip, setSkip] = useState(parseInt(queryParams.get('skip') || '0')); // 페이지네이션: 건너뛸 항목 수
