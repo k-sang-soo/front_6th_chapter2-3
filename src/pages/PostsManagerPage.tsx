@@ -14,9 +14,9 @@
  * 관심사 분리, 상태 관리, 컴포넌트 분해 원칙을 익히기
  */
 
-import { useEffect, useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Edit2, Plus, Search, ThumbsUp, Trash2 } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   Button,
   Card,
@@ -36,33 +36,30 @@ import {
   Textarea,
   TextHighlighter,
 } from '../shared/ui';
-import {
-  Post,
-  PostFormData,
-  PostsResponse,
-  PostWithAuthor,
-  SortOrder,
-} from '../entities/post/model';
-import { Tag, TagFilterOption } from '../entities/tag/model';
-import { UserProfile, UsersResponse } from '../entities/user/model';
-import { Comment, CommentFormData, CommentsResponse } from '../entities/comment/model';
+import { Post, PostFormData, PostWithAuthor, SortOrder } from '../entities/post/model';
+import { UserProfile } from '../entities/user/model';
+import { Comment, CommentFormData } from '../entities/comment/model';
 import { useCreatePost, useUpdatePost, useDeletePost } from '../features/post/mutations';
-import { useCreateComment, useUpdateComment, useDeleteComment, useLikeComment } from '../features/comment/mutations';
+import {
+  useCreateComment,
+  useUpdateComment,
+  useDeleteComment,
+  useLikeComment,
+} from '../features/comment/mutations';
 import { commentQueries } from '../entities/comment/queries';
+import { tagQueries } from '../entities/tag/queries';
 import { useQuery } from '@tanstack/react-query';
 import FetchSuspense from '../shared/ui/boundaries/fetch-suspense/FetchSuspense.tsx';
 import { PostTableContainer } from '../widgets/post/ui/post-table-container';
 
 const PostsManager = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const queryParams = new URLSearchParams(location.search);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // TanStack Query mutations
   const createPostMutation = useCreatePost();
   const updatePostMutation = useUpdatePost();
   const deletePostMutation = useDeletePost();
-  
+
   // Comment mutations
   const createCommentMutation = useCreateComment();
   const updateCommentMutation = useUpdateComment();
@@ -71,22 +68,35 @@ const PostsManager = () => {
 
   // === 상태 관리 === //
 
-  // 게시물 목록과 관련된 서버 데이터
-  const [posts, setPosts] = useState<PostWithAuthor[]>([]); // 현재 화면에 표시되는 게시물 목록
-  const [total, setTotal] = useState(0); // 전체 게시물 개수 (페이지네이션용)
-  const [loading, setLoading] = useState(false); // API 호출 중인지 표시
-  const [tags, setTags] = useState<Tag[]>([]); // 사용 가능한 모든 태그 목록
+  // 게시물 목록과 관련된 서버 데이터 (현재 PostTableContainer에서 관리)
+  const [total] = useState(0); // 전체 게시물 개수 (페이지네이션용) - PostTableContainer로 이동 예정
 
-  // 페이지네이션, 검색, 정렬을 위한 필터 상태
-  const [skip, setSkip] = useState(parseInt(queryParams.get('skip') || '0')); // 페이지네이션: 건너뛸 항목 수
-  const [limit, setLimit] = useState(parseInt(queryParams.get('limit') || '10')); // 페이지네이션: 페이지당 항목 수
-  const [searchQuery, setSearchQuery] = useState(queryParams.get('search') || ''); // 검색어
-  const [sortBy, setSortBy] = useState(queryParams.get('sortBy') || ''); // 정렬 기준 (id, title, reactions)
-  const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
-    const urlSortOrder = queryParams.get('sortOrder');
-    return urlSortOrder === 'desc' ? 'desc' : 'asc'; // 타입 가드로 안전하게 처리
-  }); // 정렬 순서 (오름차순/내림차순)
-  const [selectedTag, setSelectedTag] = useState(queryParams.get('tag') || ''); // 선택된 태그 필터
+  // URL 파라미터에서 필터 상태 파싱 (Single Source of Truth)
+  const filters = useMemo(() => ({
+    skip: parseInt(searchParams.get('skip') || '0'),
+    limit: parseInt(searchParams.get('limit') || '10'),
+    searchQuery: searchParams.get('search') || '',
+    sortBy: searchParams.get('sortBy') || '',
+    sortOrder: (searchParams.get('sortOrder') === 'desc' ? 'desc' : 'asc') as SortOrder,
+    selectedTag: searchParams.get('tag') || ''
+  }), [searchParams]);
+  
+  // 필터 업데이트 함수
+  const updateFilters = useCallback((updates: Partial<typeof filters>) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '') {
+          newParams.delete(key === 'searchQuery' ? 'search' : key);
+        } else {
+          newParams.set(key === 'searchQuery' ? 'search' : key, String(value));
+        }
+      });
+      
+      return newParams;
+    });
+  }, [setSearchParams]);
 
   // 현재 선택/편집 중인 항목들
   const [selectedPost, setSelectedPost] = useState<Post | null>(null); // 상세보기나 수정할 게시물
@@ -109,128 +119,26 @@ const PostsManager = () => {
   const [showPostDetailDialog, setShowPostDetailDialog] = useState(false); // 게시물 상세보기 다이얼로그
   const [showUserModal, setShowUserModal] = useState(false); // 사용자 정보 모달
 
+  // === TanStack Query로 데이터 가져오기 === //
+
+  // 태그 목록 쿼리
+  const { data: tagsData } = useQuery(tagQueries.list());
+  const tags = tagsData || [];
+
+  // 선택된 게시물의 댓글 쿼리
+  const { data: commentsData } = useQuery({
+    ...commentQueries.byPost({
+      postId: selectedPost?.id || 0,
+      limit: 30,
+      skip: 0,
+    }),
+    enabled: !!selectedPost?.id, // selectedPost가 있을 때만 쿼리 실행
+  });
+  const comments = commentsData?.comments || [];
+
   // === 유틸리티 함수 === //
 
-  /**
-   * 현재 필터 상태를 URL 파라미터로 변환하여 브라우저 주소창에 반영
-   * 페이지 새로고침이나 뒤로가기 시에도 필터 상태가 유지됨
-   */
-  const updateURL = () => {
-    const params = new URLSearchParams();
-    if (skip) params.set('skip', skip.toString());
-    if (limit) params.set('limit', limit.toString());
-    if (searchQuery) params.set('search', searchQuery);
-    if (sortBy) params.set('sortBy', sortBy);
-    if (sortOrder) params.set('sortOrder', sortOrder);
-    if (selectedTag) params.set('tag', selectedTag);
-    navigate(`?${params.toString()}`);
-  };
 
-  // === API 호출 함수들 === //
-
-  /**
-   * 게시물 목록을 가져오는 함수
-   * 1. 게시물 데이터를 페이지네이션과 함께 가져옴
-   * 2. 사용자 데이터를 별도로 가져옴 (username, image만)
-   * 3. 게시물에 작성자 정보를 결합해서 화면에 표시
-   */
-  const fetchPosts = () => {
-    setLoading(true);
-    let postsData: PostsResponse;
-    let usersData: UsersResponse;
-
-    fetch(`/api/posts?limit=${limit}&skip=${skip}&`)
-      .then((response) => response.json())
-      .then((data: PostsResponse) => {
-        postsData = data;
-        return fetch('/api/users?limit=0&select=username,image');
-      })
-      .then((response) => response.json())
-      .then((users: UsersResponse) => {
-        usersData = users;
-        const postsWithUsers = postsData.posts.map((post) => ({
-          ...post,
-          author: usersData.users.find((user) => user.id === post.userId),
-        }));
-        setPosts(postsWithUsers);
-        setTotal(postsData.total);
-      })
-      .catch((error) => {
-        console.error('게시물 가져오기 오류:', error);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
-  /**
-   * 사용 가능한 모든 태그 목록을 가져와서 필터 드롭다운에 표시
-   */
-  const fetchTags = async () => {
-    try {
-      const response = await fetch('/api/posts/tags');
-      const data: Tag[] = await response.json();
-      setTags(data);
-    } catch (error) {
-      console.error('태그 가져오기 오류:', error);
-    }
-  };
-
-  /**
-   * 검색어로 게시물을 찾는 함수
-   * 검색어가 비어있으면 전체 게시물을 다시 불러옴
-   *
-   * 🚨 주의: 이 함수는 레거시 코드입니다.
-   * PostTableContainer에서는 TanStack Query를 사용하므로 이 함수는 Enter 키 검색에서만 사용됩니다.
-   */
-  const searchPosts = async () => {
-    if (!searchQuery) {
-      fetchPosts();
-      return;
-    }
-    setLoading(true);
-    try {
-      // 기본값(limit=10, skip=0)을 사용하여 검색
-      const response = await fetch(`/api/posts/search?q=${searchQuery}&limit=10&skip=0`);
-      const data = await response.json();
-      setPosts(data.posts);
-      setTotal(data.total);
-    } catch (error) {
-      console.error('게시물 검색 오류:', error);
-    }
-    setLoading(false);
-  };
-
-  /**
-   * 특정 태그로 필터링된 게시물을 가져오는 함수
-   * 태그가 'all'이거나 없으면 전체 게시물을 불러옴
-   */
-  const fetchPostsByTag = async (tag: TagFilterOption) => {
-    if (!tag || tag === 'all') {
-      fetchPosts();
-      return;
-    }
-    setLoading(true);
-    try {
-      const [postsResponse, usersResponse] = await Promise.all([
-        fetch(`/api/posts/tag/${tag}`),
-        fetch('/api/users?limit=0&select=username,image'),
-      ]);
-      const postsData: PostsResponse = await postsResponse.json();
-      const usersData: UsersResponse = await usersResponse.json();
-
-      const postsWithUsers = postsData.posts.map((post) => ({
-        ...post,
-        author: usersData.users.find((user) => user.id === post.userId),
-      }));
-
-      setPosts(postsWithUsers);
-      setTotal(postsData.total);
-    } catch (error) {
-      console.error('태그별 게시물 가져오기 오류:', error);
-    }
-    setLoading(false);
-  };
 
   // === 게시물 CRUD 함수들 === //
 
@@ -279,22 +187,6 @@ const PostsManager = () => {
   };
 
   // === 댓글 관련 함수들 === //
-
-  // 선택된 게시물의 댓글을 TanStack Query로 가져오기
-  const {
-    data: commentsData,
-    isLoading: commentsLoading,
-    error: commentsError,
-  } = useQuery({
-    ...commentQueries.byPost({ 
-      postId: selectedPost?.id || 0, 
-      limit: 30, 
-      skip: 0 
-    }),
-    enabled: !!selectedPost?.id, // selectedPost가 있을 때만 쿼리 실행
-  });
-
-  const comments = commentsData?.comments || [];
 
   /**
    * 새 댓글을 추가하는 함수 (TanStack Query 사용)
@@ -395,34 +287,7 @@ const PostsManager = () => {
   // 🚨 문제점 #3: useEffect 의존성 관리 문제 + 복잡한 사이드 이펙트
   // 👉 개선 방향: 커스텀 훅으로 분리하고 의존성을 명확히 관리
 
-  // 초기 태그 로딩
-  useEffect(() => {
-    fetchTags();
-  }, []); // ✅ 의존성 없음 - 한 번만 실행
-
-  // 🔄 필터/페이지 변경 시 데이터 리로딩 + URL 동기화
-  useEffect(() => {
-    if (selectedTag) {
-      fetchPostsByTag(selectedTag);
-    } else {
-      fetchPosts();
-    }
-    updateURL();
-  }, [skip, limit, sortBy, sortOrder, selectedTag]);
-  // 🚨 문제: fetchPosts, fetchPostsByTag, updateURL이 의존성에 없음!
-  // ESLint exhaustive-deps 규칙 위반
-
-  // 🌐 URL 파라미터를 상태로 동기화 (브라우저 뒤로가기 대응)
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    setSkip(parseInt(params.get('skip') || '0'));
-    setLimit(parseInt(params.get('limit') || '10'));
-    setSearchQuery(params.get('search') || '');
-    setSortBy(params.get('sortBy') || '');
-    const urlSortOrder = params.get('sortOrder');
-    setSortOrder(urlSortOrder === 'desc' ? 'desc' : 'asc');
-    setSelectedTag(params.get('tag') || '');
-  }, [location.search]); // ✅ location.search 의존성만 필요
+  // useSearchParams로 URL 자동 동기화 - useEffect 불필요
 
   // 댓글 렌더링
   const renderComments = (postId: Post['id'] | undefined) => {
@@ -452,7 +317,7 @@ const PostsManager = () => {
               <div className="flex items-center space-x-2 overflow-hidden">
                 <span className="font-medium truncate">{comment.user.username}:</span>
                 <span className="truncate">
-                  {<TextHighlighter text={comment.body} highlight={searchQuery} />}
+                  {<TextHighlighter text={comment.body} highlight={filters.searchQuery} />}
                 </span>
               </div>
               <div className="flex items-center space-x-1">
@@ -502,19 +367,17 @@ const PostsManager = () => {
                 <Input
                   placeholder="게시물 검색..."
                   className="pl-8"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && searchPosts()}
+                  value={filters.searchQuery}
+                  onChange={(e) => updateFilters({ searchQuery: e.target.value })}
+                  onKeyDown={(e) =>
+                    e.key === 'Enter' && console.log('Enter 검색: PostTableContainer에서 처리')
+                  }
                 />
               </div>
             </div>
             <Select
-              value={selectedTag}
-              onValueChange={(value) => {
-                setSelectedTag(value);
-                fetchPostsByTag(value);
-                updateURL();
-              }}
+              value={filters.selectedTag}
+              onValueChange={(value) => updateFilters({ selectedTag: value })}
             >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="태그 선택" />
@@ -528,7 +391,7 @@ const PostsManager = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={sortBy} onValueChange={setSortBy}>
+            <Select value={filters.sortBy} onValueChange={(value) => updateFilters({ sortBy: value })}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="정렬 기준" />
               </SelectTrigger>
@@ -540,8 +403,8 @@ const PostsManager = () => {
               </SelectContent>
             </Select>
             <Select
-              value={sortOrder}
-              onValueChange={(value) => setSortOrder(value === 'desc' ? 'desc' : 'asc')}
+              value={filters.sortOrder}
+              onValueChange={(value) => updateFilters({ sortOrder: value === 'desc' ? 'desc' : 'asc' })}
             >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="정렬 순서" />
@@ -559,16 +422,8 @@ const PostsManager = () => {
             loadingComponent={<div className="flex justify-center p-4">로딩 중...</div>}
           >
             <PostTableContainer
-              filters={{
-                limit,
-                skip,
-                searchQuery,
-                selectedTag,
-                sortBy,
-                sortOrder,
-              }}
-              onTagSelect={setSelectedTag}
-              onURLUpdate={updateURL}
+              filters={filters}
+              onTagSelect={(tag) => updateFilters({ selectedTag: tag })}
               onUserModalOpen={openUserModal}
               onPostDetailOpen={openPostDetail}
               onPostDelete={deletePost}
@@ -581,7 +436,7 @@ const PostsManager = () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <span>표시</span>
-              <Select value={limit.toString()} onValueChange={(value) => setLimit(Number(value))}>
+              <Select value={filters.limit.toString()} onValueChange={(value) => updateFilters({ limit: Number(value) })}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="10" />
                 </SelectTrigger>
@@ -594,10 +449,10 @@ const PostsManager = () => {
               <span>항목</span>
             </div>
             <div className="flex gap-2">
-              <Button disabled={skip === 0} onClick={() => setSkip(Math.max(0, skip - limit))}>
+              <Button disabled={filters.skip === 0} onClick={() => updateFilters({ skip: Math.max(0, filters.skip - filters.limit) })}>
                 이전
               </Button>
-              <Button disabled={skip + limit >= total} onClick={() => setSkip(skip + limit)}>
+              <Button disabled={filters.skip + filters.limit >= total} onClick={() => updateFilters({ skip: filters.skip + filters.limit })}>
                 다음
               </Button>
             </div>
@@ -719,11 +574,11 @@ const PostsManager = () => {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>
-              {<TextHighlighter text={selectedPost?.title} highlight={searchQuery} />}
+              {<TextHighlighter text={selectedPost?.title} highlight={filters.searchQuery} />}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p>{<TextHighlighter text={selectedPost?.body} highlight={searchQuery} />}</p>
+            <p>{<TextHighlighter text={selectedPost?.body} highlight={filters.searchQuery} />}</p>
             {renderComments(selectedPost?.id)}
           </div>
         </DialogContent>
