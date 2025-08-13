@@ -27,22 +27,3 @@ export interface PostWithAuthor extends Post {
   author?: User;
 }
 
-// 게시물 작성/수정 폼 데이터 타입
-export interface PostFormData {
-  title: string;
-  body: string;
-  userId: number;
-}
-
-// 게시물 필터링 관련 타입들
-export type SortBy = '' | 'id' | 'title' | 'reactions';
-export type SortOrder = 'asc' | 'desc';
-
-export interface PostFilters {
-  searchQuery: string;
-  selectedTag: string;
-  sortBy: SortBy;
-  sortOrder: SortOrder;
-  skip: number;
-  limit: number;
-}
