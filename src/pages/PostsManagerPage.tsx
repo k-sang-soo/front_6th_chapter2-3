@@ -72,31 +72,37 @@ const PostsManager = () => {
   const [total] = useState(0); // 전체 게시물 개수 (페이지네이션용) - PostTableContainer로 이동 예정
 
   // URL 파라미터에서 필터 상태 파싱 (Single Source of Truth)
-  const filters = useMemo(() => ({
-    skip: parseInt(searchParams.get('skip') || '0'),
-    limit: parseInt(searchParams.get('limit') || '10'),
-    searchQuery: searchParams.get('search') || '',
-    sortBy: searchParams.get('sortBy') || '',
-    sortOrder: (searchParams.get('sortOrder') === 'desc' ? 'desc' : 'asc') as SortOrder,
-    selectedTag: searchParams.get('tag') || ''
-  }), [searchParams]);
-  
+  const filters = useMemo(
+    () => ({
+      skip: parseInt(searchParams.get('skip') || '0'),
+      limit: parseInt(searchParams.get('limit') || '10'),
+      searchQuery: searchParams.get('search') || '',
+      sortBy: searchParams.get('sortBy') || '',
+      sortOrder: (searchParams.get('sortOrder') === 'desc' ? 'desc' : 'asc') as SortOrder,
+      selectedTag: searchParams.get('tag') || '',
+    }),
+    [searchParams],
+  );
+
   // 필터 업데이트 함수
-  const updateFilters = useCallback((updates: Partial<typeof filters>) => {
-    setSearchParams(prev => {
-      const newParams = new URLSearchParams(prev);
-      
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value === null || value === undefined || value === '') {
-          newParams.delete(key === 'searchQuery' ? 'search' : key);
-        } else {
-          newParams.set(key === 'searchQuery' ? 'search' : key, String(value));
-        }
+  const updateFilters = useCallback(
+    (updates: Partial<typeof filters>) => {
+      setSearchParams((prev) => {
+        const newParams = new URLSearchParams(prev);
+
+        Object.entries(updates).forEach(([key, value]) => {
+          if (value === null || value === undefined || value === '') {
+            newParams.delete(key === 'searchQuery' ? 'search' : key);
+          } else {
+            newParams.set(key === 'searchQuery' ? 'search' : key, String(value));
+          }
+        });
+
+        return newParams;
       });
-      
-      return newParams;
-    });
-  }, [setSearchParams]);
+    },
+    [setSearchParams],
+  );
 
   // 현재 선택/편집 중인 항목들
   const [selectedPost, setSelectedPost] = useState<Post | null>(null); // 상세보기나 수정할 게시물
@@ -137,8 +143,6 @@ const PostsManager = () => {
   const comments = commentsData?.comments || [];
 
   // === 유틸리티 함수 === //
-
-
 
   // === 게시물 CRUD 함수들 === //
 
@@ -189,7 +193,7 @@ const PostsManager = () => {
   // === 댓글 관련 함수들 === //
 
   /**
-   * 새 댓글을 추가하는 함수 (TanStack Query 사용)
+   * 새 댓글을 추가하는 함수
    * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
    */
   const addComment = (newComment: CommentFormData) => {
@@ -202,7 +206,7 @@ const PostsManager = () => {
   };
 
   /**
-   * 선택된 댓글을 수정하는 함수 (TanStack Query 사용)
+   * 선택된 댓글을 수정하는 함수
    * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
    */
   const updateComment = (commentId: Comment['id'], commentData: Pick<CommentFormData, 'body'>) => {
@@ -221,7 +225,7 @@ const PostsManager = () => {
   };
 
   /**
-   * 댓글을 삭제하는 함수 (TanStack Query 사용)
+   * 댓글을 삭제하는 함수
    * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
    */
   const deleteComment = (commentId: Comment['id']) => {
@@ -238,7 +242,7 @@ const PostsManager = () => {
   };
 
   /**
-   * 댓글에 좋아요를 추가하는 함수 (TanStack Query 사용)
+   * 댓글에 좋아요를 추가하는 함수
    * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
    */
   const likeComment = (commentId: Comment['id']) => {
@@ -259,7 +263,7 @@ const PostsManager = () => {
   // === UI 상호작용 함수들 === //
 
   /**
-   * 게시물 상세보기 다이얼로그를 여는 함수 (TanStack Query 사용)
+   * 게시물 상세보기 다이얼로그를 여는 함수
    * 선택된 게시물을 설정하면 댓글이 자동으로 로드됨
    */
   const openPostDetail = (post: Post) => {
@@ -391,7 +395,10 @@ const PostsManager = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={filters.sortBy} onValueChange={(value) => updateFilters({ sortBy: value })}>
+            <Select
+              value={filters.sortBy}
+              onValueChange={(value) => updateFilters({ sortBy: value })}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="정렬 기준" />
               </SelectTrigger>
@@ -404,7 +411,9 @@ const PostsManager = () => {
             </Select>
             <Select
               value={filters.sortOrder}
-              onValueChange={(value) => updateFilters({ sortOrder: value === 'desc' ? 'desc' : 'asc' })}
+              onValueChange={(value) =>
+                updateFilters({ sortOrder: value === 'desc' ? 'desc' : 'asc' })
+              }
             >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="정렬 순서" />
@@ -436,7 +445,10 @@ const PostsManager = () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <span>표시</span>
-              <Select value={filters.limit.toString()} onValueChange={(value) => updateFilters({ limit: Number(value) })}>
+              <Select
+                value={filters.limit.toString()}
+                onValueChange={(value) => updateFilters({ limit: Number(value) })}
+              >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="10" />
                 </SelectTrigger>
@@ -449,10 +461,16 @@ const PostsManager = () => {
               <span>항목</span>
             </div>
             <div className="flex gap-2">
-              <Button disabled={filters.skip === 0} onClick={() => updateFilters({ skip: Math.max(0, filters.skip - filters.limit) })}>
+              <Button
+                disabled={filters.skip === 0}
+                onClick={() => updateFilters({ skip: Math.max(0, filters.skip - filters.limit) })}
+              >
                 이전
               </Button>
-              <Button disabled={filters.skip + filters.limit >= total} onClick={() => updateFilters({ skip: filters.skip + filters.limit })}>
+              <Button
+                disabled={filters.skip + filters.limit >= total}
+                onClick={() => updateFilters({ skip: filters.skip + filters.limit })}
+              >
                 다음
               </Button>
             </div>
