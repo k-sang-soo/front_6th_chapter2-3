@@ -15,7 +15,7 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import { Edit2, Plus, Search, ThumbsUp, Trash2 } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Button,
@@ -51,6 +51,7 @@ import { tagQueries } from '../entities/tag/queries';
 import { useQuery } from '@tanstack/react-query';
 import FetchSuspense from '../shared/ui/boundaries/fetch-suspense/FetchSuspense.tsx';
 import { PostTableContainer } from '../widgets/post/ui/post-table-container';
+import { CommentList } from '../widgets/comment/ui';
 
 const PostsManager = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -288,62 +289,6 @@ const PostsManager = () => {
     }
   };
 
-  // 댓글 렌더링
-  const renderComments = (postId: Post['id'] | undefined) => {
-    if (!postId) return null;
-
-    return (
-      <div className="mt-2">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold">댓글</h3>
-          <Button
-            size="sm"
-            onClick={() => {
-              setNewComment((prev) => ({ ...prev, postId }));
-              setShowAddCommentDialog(true);
-            }}
-          >
-            <Plus className="w-3 h-3 mr-1" />
-            댓글 추가
-          </Button>
-        </div>
-        <div className="space-y-1">
-          {comments.map((comment) => (
-            <div
-              key={comment.id}
-              className="flex items-center justify-between text-sm border-b pb-1"
-            >
-              <div className="flex items-center space-x-2 overflow-hidden">
-                <span className="font-medium truncate">{comment.user.username}:</span>
-                <span className="truncate">
-                  {<TextHighlighter text={comment.body} highlight={filters.searchQuery} />}
-                </span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Button variant="ghost" size="sm" onClick={() => likeComment(comment.id)}>
-                  <ThumbsUp className="w-3 h-3" />
-                  <span className="ml-1 text-xs">{comment.likes}</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedComment(comment);
-                    setShowEditCommentDialog(true);
-                  }}
-                >
-                  <Edit2 className="w-3 h-3" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => deleteComment(comment.id)}>
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <Card className="w-full max-w-6xl mx-auto">
@@ -592,7 +537,21 @@ const PostsManager = () => {
           </DialogHeader>
           <div className="space-y-4">
             <p>{<TextHighlighter text={selectedPost?.body} highlight={filters.searchQuery} />}</p>
-            {renderComments(selectedPost?.id)}
+            <CommentList
+              postId={selectedPost?.id}
+              comments={comments}
+              searchQuery={filters.searchQuery}
+              onAddComment={(postId) => {
+                setNewComment((prev) => ({ ...prev, postId }));
+                setShowAddCommentDialog(true);
+              }}
+              onEditComment={(comment) => {
+                setSelectedComment(comment);
+                setShowEditCommentDialog(true);
+              }}
+              onDeleteComment={deleteComment}
+              onLikeComment={likeComment}
+            />
           </div>
         </DialogContent>
       </Dialog>
