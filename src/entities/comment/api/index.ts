@@ -3,9 +3,8 @@ import { axiosInstance } from '../../../app/libs/axiosInstance.old.ts';
 import type { CommentsResponse } from '../model';
 
 // 특정 게시물의 댓글 조회
-export const getComments = async ({ postId, limit, skip }: CommentRequest): Promise<CommentsResponse> => {
-  const url = `/comments/post/${postId}${limit ? `?limit=${limit}&skip=${skip || 0}` : ''}`;
-  const response = await axiosInstance.get(url);
+export const getComments = async ({ postId }: CommentRequest): Promise<CommentsResponse> => {
+  const response = await axiosInstance.get(`/comments/post/${postId}`);
   return response.data;
 };
 

@@ -14,8 +14,6 @@ export interface CommentFormData {
 // 댓글 조회 요청 타입
 export interface CommentRequest {
   postId: number;
-  limit?: number;
-  skip?: number;
 }
 
 // 댓글 좋아요 요청 타입

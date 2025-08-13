@@ -6,9 +6,9 @@ export const commentQueries = {
   allKey: () => ['comments'] as const,
   byPostKey: (postId: number) => [...commentQueries.allKey(), 'post', postId] as const,
 
-  byPost: ({ postId, limit, skip }: CommentRequest) =>
+  byPost: ({ postId }: CommentRequest) =>
     queryOptions({
-      queryKey: [...commentQueries.byPostKey(postId), { limit, skip }],
-      queryFn: () => getComments({ postId, limit, skip }),
+      queryKey: commentQueries.byPostKey(postId),
+      queryFn: () => getComments({ postId }),
     }),
 };

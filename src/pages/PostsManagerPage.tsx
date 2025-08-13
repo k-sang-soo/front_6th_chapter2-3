@@ -136,8 +136,6 @@ const PostsManager = () => {
   const { data: commentsData } = useQuery({
     ...commentQueries.byPost({
       postId: selectedPost?.id || 0,
-      limit: 30,
-      skip: 0,
     }),
     enabled: !!selectedPost?.id, // selectedPost가 있을 때만 쿼리 실행
   });
