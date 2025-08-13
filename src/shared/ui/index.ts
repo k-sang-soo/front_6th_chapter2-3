@@ -31,3 +31,6 @@ export {
 
 // Table Components
 export { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './table';
+
+// Text Components  
+export { TextHighlighter } from './text-highlighter';
