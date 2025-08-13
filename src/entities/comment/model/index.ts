@@ -1,1 +1,2 @@
-export type { Comment, CommentsResponse, CommentFormData } from './types.ts';
+export type { Comment, CommentsResponse } from './response.types';
+export type { CommentFormData, CommentRequest, CommentLikeRequest } from './request.types';
