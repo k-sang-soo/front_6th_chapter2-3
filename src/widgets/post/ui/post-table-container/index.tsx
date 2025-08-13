@@ -9,35 +9,32 @@ import {
   TextHighlighter,
 } from '../../../../shared/ui';
 import { Edit2, MessageSquare, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
-import { Post, PostWithAuthor } from '../../../../entities/post/model';
-import { UserProfile } from '../../../../entities/user/model';
+import { Post, PostWithAuthor, PostRequest } from '../../../../entities/post/model';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { postQueries } from '../../../../entities/post/queries/query.ts';
+import { postQueries } from '../../../../entities/post/queries';
 
 interface PostTableContainerProps {
-  searchQuery: string;
-  selectedTag: string;
-  setSelectedTag: (tag: string) => void;
-  updateURL: () => void;
-  openUserModal: (user: UserProfile | null) => void;
-  openPostDetail: (post: Post) => void;
-  deletePost: (postId: Post['id']) => void;
-  setShowEditDialog: (show: boolean) => void;
-  setSelectedPost: (post: Post) => void;
+  filters: PostRequest;
+  onTagSelect: (tag: string) => void;
+  onURLUpdate: () => void;
+  onUserModalOpen: (user: PostWithAuthor['author']) => void;
+  onPostDetailOpen: (post: Post) => void;
+  onPostDelete: (postId: Post['id']) => void;
+  onEditDialogOpen: (show: boolean) => void;
+  onPostSelect: (post: Post) => void;
 }
 
 export const PostTableContainer = ({
-  deletePost,
-  openPostDetail,
-  searchQuery,
-  openUserModal,
-  setShowEditDialog,
-  updateURL,
-  setSelectedTag,
-  selectedTag,
-  setSelectedPost,
+  filters,
+  onTagSelect,
+  onURLUpdate,
+  onUserModalOpen,
+  onPostDetailOpen,
+  onPostDelete,
+  onEditDialogOpen,
+  onPostSelect,
 }: PostTableContainerProps) => {
-  const { data: posts } = useSuspenseQuery(postQueries.postsWithAuthors());
+  const { data: posts } = useSuspenseQuery(postQueries.postsWithAuthors(filters));
 
   return (
     <Table>
@@ -57,7 +54,7 @@ export const PostTableContainer = ({
             <TableCell>
               <div className="space-y-1">
                 <div>
-                  <TextHighlighter text={post.title} highlight={searchQuery} />
+                  <TextHighlighter text={post.title} highlight={filters.searchQuery || ''} />
                 </div>
 
                 <div className="flex flex-wrap gap-1">
@@ -65,13 +62,13 @@ export const PostTableContainer = ({
                     <span
                       key={tag}
                       className={`px-1 text-[9px] font-semibold rounded-[4px] cursor-pointer ${
-                        selectedTag === tag
+                        filters.selectedTag === tag
                           ? 'text-white bg-blue-500 hover:bg-blue-600'
                           : 'text-blue-800 bg-blue-100 hover:bg-blue-200'
                       }`}
                       onClick={() => {
-                        setSelectedTag(tag);
-                        updateURL();
+                        onTagSelect(tag);
+                        onURLUpdate();
                       }}
                     >
                       {tag}
@@ -83,7 +80,7 @@ export const PostTableContainer = ({
             <TableCell>
               <div
                 className="flex items-center space-x-2 cursor-pointer"
-                onClick={() => openUserModal(post.author)}
+                onClick={() => onUserModalOpen(post.author)}
               >
                 <img
                   src={post.author?.image}
@@ -103,20 +100,20 @@ export const PostTableContainer = ({
             </TableCell>
             <TableCell>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => openPostDetail(post)}>
+                <Button variant="ghost" size="sm" onClick={() => onPostDetailOpen(post)}>
                   <MessageSquare className="w-4 h-4" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    setSelectedPost(post);
-                    setShowEditDialog(true);
+                    onPostSelect(post);
+                    onEditDialogOpen(true);
                   }}
                 >
                   <Edit2 className="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => deletePost(post.id)}>
+                <Button variant="ghost" size="sm" onClick={() => onPostDelete(post.id)}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
