@@ -47,6 +47,9 @@ import { Tag, TagFilterOption } from '../entities/tag/model';
 import { UserProfile, UsersResponse } from '../entities/user/model';
 import { Comment, CommentFormData, CommentsResponse } from '../entities/comment/model';
 import { useCreatePost, useUpdatePost, useDeletePost } from '../features/post/mutations';
+import { useCreateComment, useUpdateComment, useDeleteComment, useLikeComment } from '../features/comment/mutations';
+import { commentQueries } from '../entities/comment/queries';
+import { useQuery } from '@tanstack/react-query';
 import FetchSuspense from '../shared/ui/boundaries/fetch-suspense/FetchSuspense.tsx';
 import { PostTableContainer } from '../widgets/post/ui/post-table-container';
 
@@ -59,6 +62,12 @@ const PostsManager = () => {
   const createPostMutation = useCreatePost();
   const updatePostMutation = useUpdatePost();
   const deletePostMutation = useDeletePost();
+  
+  // Comment mutations
+  const createCommentMutation = useCreateComment();
+  const updateCommentMutation = useUpdateComment();
+  const deleteCommentMutation = useDeleteComment();
+  const likeCommentMutation = useLikeComment();
 
   // === 상태 관리 === //
 
@@ -67,7 +76,6 @@ const PostsManager = () => {
   const [total, setTotal] = useState(0); // 전체 게시물 개수 (페이지네이션용)
   const [loading, setLoading] = useState(false); // API 호출 중인지 표시
   const [tags, setTags] = useState<Tag[]>([]); // 사용 가능한 모든 태그 목록
-  const [comments, setComments] = useState<Comment[]>([]); // 각 게시물별 댓글 저장 객체
 
   // 페이지네이션, 검색, 정렬을 위한 필터 상태
   const [skip, setSkip] = useState(parseInt(queryParams.get('skip') || '0')); // 페이지네이션: 건너뛸 항목 수
@@ -227,7 +235,7 @@ const PostsManager = () => {
   // === 게시물 CRUD 함수들 === //
 
   /**
-   * 새 게시물을 생성하는 함수 (TanStack Query mutation 사용)
+   * 새 게시물을 생성하는 함수
    * 성공하면 쿼리 캐시가 자동으로 무효화되어 목록이 새로고침됨
    */
   const addPost = () => {
@@ -240,7 +248,7 @@ const PostsManager = () => {
   };
 
   /**
-   * 선택된 게시물을 수정하는 함수 (TanStack Query mutation 사용)
+   * 선택된 게시물을 수정하는 함수
    * 성공하면 쿼리 캐시가 자동으로 무효화되어 목록이 새로고침됨
    */
   const updatePost = (postId: Post['id']) => {
@@ -263,7 +271,7 @@ const PostsManager = () => {
   };
 
   /**
-   * 게시물을 삭제하는 함수 (TanStack Query mutation 사용)
+   * 게시물을 삭제하는 함수
    * 성공하면 쿼리 캐시가 자동으로 무효화되어 목록이 새로고침됨
    */
   const deletePost = (postId: Post['id']) => {
@@ -272,118 +280,98 @@ const PostsManager = () => {
 
   // === 댓글 관련 함수들 === //
 
+  // 선택된 게시물의 댓글을 TanStack Query로 가져오기
+  const {
+    data: commentsData,
+    isLoading: commentsLoading,
+    error: commentsError,
+  } = useQuery({
+    ...commentQueries.byPost({ 
+      postId: selectedPost?.id || 0, 
+      limit: 30, 
+      skip: 0 
+    }),
+    enabled: !!selectedPost?.id, // selectedPost가 있을 때만 쿼리 실행
+  });
+
+  const comments = commentsData?.comments || [];
+
   /**
-   * 특정 게시물의 댓글을 가져오는 함수
-   * 이미 불러온 댓글이 있으면 중복 호출을 방지함 (캐시 역할)
+   * 새 댓글을 추가하는 함수 (TanStack Query 사용)
+   * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
    */
-  const fetchComments = async (postId: Post['id']) => {
-    try {
-      const response = await fetch(`/api/comments/post/${postId}`);
-      const data: CommentsResponse = await response.json();
-      setComments(data.comments);
-    } catch (error) {
-      console.error('댓글 가져오기 오류:', error);
-    }
+  const addComment = (newComment: CommentFormData) => {
+    createCommentMutation.mutate(newComment, {
+      onSuccess: () => {
+        setShowAddCommentDialog(false);
+        setNewComment({ body: '', postId: 1, userId: 1 });
+      },
+    });
   };
 
   /**
-   * 새 댓글을 추가하는 함수
-   * 성공하면 해당 게시물의 댓글 목록에 추가하고 작성 폼을 초기화
+   * 선택된 댓글을 수정하는 함수 (TanStack Query 사용)
+   * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
    */
-  const addComment = async (newComment: CommentFormData) => {
-    try {
-      const response = await fetch('/api/comments/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newComment),
-      });
-      const data = await response.json();
-      setComments((prev) => [data, ...prev]);
-      setShowAddCommentDialog(false);
-      setNewComment({ body: '', postId: 1, userId: 1 });
-    } catch (error) {
-      console.error('댓글 추가 오류:', error);
-    }
-  };
-
-  /**
-   * 선택된 댓글을 수정하는 함수
-   * 성공하면 댓글 목록에서 해당 댓글을 업데이트
-   */
-  const updateComment = async (updatedId: Comment['id'], updateComment: CommentFormData) => {
-    if (!updatedId) {
+  const updateComment = (commentId: Comment['id'], commentData: Pick<CommentFormData, 'body'>) => {
+    if (!commentId) {
       return;
     }
 
-    try {
-      const response = await fetch(`/api/comments/${updatedId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: updateComment.body }),
-      });
-      const data = await response.json();
-      setComments((prev) => {
-        return prev.map((comment) => (comment.id === data.id ? data : comment));
-      });
-      setShowEditCommentDialog(false);
-    } catch (error) {
-      console.error('댓글 업데이트 오류:', error);
-    }
+    updateCommentMutation.mutate(
+      { commentId, commentData },
+      {
+        onSuccess: () => {
+          setShowEditCommentDialog(false);
+        },
+      },
+    );
   };
 
   /**
-   * 댓글을 삭제하는 함수
-   * 성공하면 해당 게시물의 댓글 목록에서 제거
+   * 댓글을 삭제하는 함수 (TanStack Query 사용)
+   * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
    */
-  const deleteComment = async (commentId: Comment['id']) => {
-    try {
-      await fetch(`/api/comments/${commentId}`, {
-        method: 'DELETE',
-      });
-      setComments((prev) => prev.filter((comment) => comment.id !== commentId));
-    } catch (error) {
-      console.error('댓글 삭제 오류:', error);
+  const deleteComment = (commentId: Comment['id']) => {
+    // 현재 선택된 게시물의 ID를 가져와야 함
+    if (!selectedPost?.id) {
+      console.error('선택된 게시물이 없습니다');
+      return;
     }
+
+    deleteCommentMutation.mutate({
+      commentId,
+      postId: selectedPost.id,
+    });
   };
 
   /**
-   * 댓글에 좋아요를 추가하는 함수
-   * 현재 좋아요 수에 1을 더해서 서버에 업데이트
+   * 댓글에 좋아요를 추가하는 함수 (TanStack Query 사용)
+   * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
    */
-  const likeComment = async (commentId: Comment['id']) => {
-    try {
-      const targetComment = comments.find((comment) => comment.id === commentId);
+  const likeComment = (commentId: Comment['id']) => {
+    const targetComment = comments.find((comment) => comment.id === commentId);
 
-      if (!targetComment) {
-        console.error('댓글을 찾을 수 없습니다:', commentId);
-        return;
-      }
-
-      const response = await fetch(`/api/comments/${commentId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          likes: targetComment.likes + 1,
-        }),
-      });
-      const data = await response.json();
-      setComments((prev) => {
-        return prev.map((comment) => (comment.id === data.id ? data : comment));
-      });
-    } catch (error) {
-      console.error('댓글 좋아요 오류:', error);
+    if (!targetComment || !selectedPost?.id) {
+      console.error('댓글 또는 선택된 게시물을 찾을 수 없습니다:', commentId);
+      return;
     }
+
+    likeCommentMutation.mutate({
+      commentId,
+      likes: targetComment.likes + 1,
+      postId: selectedPost.id,
+    });
   };
 
   // === UI 상호작용 함수들 === //
 
   /**
-   * 게시물 상세보기 다이얼로그를 여는 함수
-   * 선택된 게시물을 설정하고 해당 게시물의 댓글을 불러온 후 다이얼로그 표시
+   * 게시물 상세보기 다이얼로그를 여는 함수 (TanStack Query 사용)
+   * 선택된 게시물을 설정하면 댓글이 자동으로 로드됨
    */
   const openPostDetail = (post: Post) => {
     setSelectedPost(post);
-    fetchComments(post.id);
     setShowPostDetailDialog(true);
   };
 
@@ -717,7 +705,7 @@ const PostsManager = () => {
             <Button
               onClick={() => {
                 if (!selectedComment || !selectedComment.id) return;
-                updateComment(selectedComment.id, newComment);
+                updateComment(selectedComment.id, { body: selectedComment.body });
               }}
             >
               댓글 업데이트
