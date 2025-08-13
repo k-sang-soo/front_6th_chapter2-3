@@ -8,7 +8,7 @@
  */
 import { BrowserRouter as Router } from 'react-router-dom';
 import PostsManagerPage from './pages/PostsManagerPage.tsx';
-import { DefaultLayout } from './widgets/ui/layout';
+import { DefaultLayout } from './widgets/layout/ui';
 import { QueryProvider } from './app/providers/query-client';
 
 const App = () => {

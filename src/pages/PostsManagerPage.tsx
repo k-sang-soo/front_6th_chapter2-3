@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Edit2, MessageSquare, Plus, Search, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
+import { Edit2, Plus, Search, ThumbsUp, Trash2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -33,24 +33,32 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Textarea,
+  TextHighlighter,
 } from '../shared/ui';
-import { Post, PostsResponse, PostWithAuthor } from '../entities/post/model';
+import {
+  Post,
+  PostFormData,
+  PostsResponse,
+  PostWithAuthor,
+  SortOrder,
+} from '../entities/post/model';
 import { Tag, TagFilterOption } from '../entities/tag/model';
 import { UserProfile, UsersResponse } from '../entities/user/model';
-import { PostFormData } from '../entities/post/model/types.ts';
 import { Comment, CommentFormData, CommentsResponse } from '../entities/comment/model';
+import { useCreatePost, useUpdatePost, useDeletePost } from '../features/post/mutations';
+import FetchSuspense from '../shared/ui/boundaries/fetch-suspense/FetchSuspense.tsx';
+import { PostTableContainer } from '../widgets/post/ui/post-table-container';
 
 const PostsManager = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
+
+  // TanStack Query mutations
+  const createPostMutation = useCreatePost();
+  const updatePostMutation = useUpdatePost();
+  const deletePostMutation = useDeletePost();
 
   // === 상태 관리 === //
 
@@ -66,7 +74,10 @@ const PostsManager = () => {
   const [limit, setLimit] = useState(parseInt(queryParams.get('limit') || '10')); // 페이지네이션: 페이지당 항목 수
   const [searchQuery, setSearchQuery] = useState(queryParams.get('search') || ''); // 검색어
   const [sortBy, setSortBy] = useState(queryParams.get('sortBy') || ''); // 정렬 기준 (id, title, reactions)
-  const [sortOrder, setSortOrder] = useState(queryParams.get('sortOrder') || 'asc'); // 정렬 순서 (오름차순/내림차순)
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+    const urlSortOrder = queryParams.get('sortOrder');
+    return urlSortOrder === 'desc' ? 'desc' : 'asc'; // 타입 가드로 안전하게 처리
+  }); // 정렬 순서 (오름차순/내림차순)
   const [selectedTag, setSelectedTag] = useState(queryParams.get('tag') || ''); // 선택된 태그 필터
 
   // 현재 선택/편집 중인 항목들
@@ -160,6 +171,9 @@ const PostsManager = () => {
   /**
    * 검색어로 게시물을 찾는 함수
    * 검색어가 비어있으면 전체 게시물을 다시 불러옴
+   *
+   * 🚨 주의: 이 함수는 레거시 코드입니다.
+   * PostTableContainer에서는 TanStack Query를 사용하므로 이 함수는 Enter 키 검색에서만 사용됩니다.
    */
   const searchPosts = async () => {
     if (!searchQuery) {
@@ -168,7 +182,8 @@ const PostsManager = () => {
     }
     setLoading(true);
     try {
-      const response = await fetch(`/api/posts/search?q=${searchQuery}`);
+      // 기본값(limit=10, skip=0)을 사용하여 검색
+      const response = await fetch(`/api/posts/search?q=${searchQuery}&limit=10&skip=0`);
       const data = await response.json();
       setPosts(data.posts);
       setTotal(data.total);
@@ -212,59 +227,47 @@ const PostsManager = () => {
   // === 게시물 CRUD 함수들 === //
 
   /**
-   * 새 게시물을 생성하는 함수
-   * 성공하면 목록 맨 앞에 추가하고 작성 다이얼로그를 닫음
+   * 새 게시물을 생성하는 함수 (TanStack Query mutation 사용)
+   * 성공하면 쿼리 캐시가 자동으로 무효화되어 목록이 새로고침됨
    */
-  // userId를 생성할 때 작업자가 지정해주는 방식
-  // 존재하지 않는  userId를 생성하면??...
-  const addPost = async () => {
-    try {
-      const response = await fetch('/api/posts/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newPost),
-      });
-      const data = await response.json();
-      setPosts([data, ...posts]);
-      setShowAddDialog(false);
-      setNewPost({ title: '', body: '', userId: 1 });
-    } catch (error) {
-      console.error('게시물 추가 오류:', error);
-    }
+  const addPost = () => {
+    createPostMutation.mutate(newPost, {
+      onSuccess: () => {
+        setShowAddDialog(false);
+        setNewPost({ title: '', body: '', userId: 1 });
+      },
+    });
   };
 
   /**
-   * 선택된 게시물을 수정하는 함수
-   * 성공하면 목록에서 해당 게시물을 업데이트하고 수정 다이얼로그를 닫음
+   * 선택된 게시물을 수정하는 함수 (TanStack Query mutation 사용)
+   * 성공하면 쿼리 캐시가 자동으로 무효화되어 목록이 새로고침됨
    */
-  const updatePost = async (postId: Post['id']) => {
-    try {
-      const response = await fetch(`/api/posts/${postId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(selectedPost),
-      });
-      const data = await response.json();
-      setPosts(posts.map((post) => (post.id === data.id ? data : post)));
-      setShowEditDialog(false);
-    } catch (error) {
-      console.error('게시물 업데이트 오류:', error);
-    }
+  const updatePost = (postId: Post['id']) => {
+    if (!selectedPost) return;
+
+    const postData = {
+      title: selectedPost.title,
+      body: selectedPost.body,
+      userId: selectedPost.userId,
+    };
+
+    updatePostMutation.mutate(
+      { postId, postData },
+      {
+        onSuccess: () => {
+          setShowEditDialog(false);
+        },
+      },
+    );
   };
 
   /**
-   * 게시물을 삭제하는 함수
-   * 성공하면 목록에서 해당 게시물을 제거
+   * 게시물을 삭제하는 함수 (TanStack Query mutation 사용)
+   * 성공하면 쿼리 캐시가 자동으로 무효화되어 목록이 새로고침됨
    */
-  const deletePost = async (postId: Post['id']) => {
-    try {
-      await fetch(`/api/posts/${postId}`, {
-        method: 'DELETE',
-      });
-      setPosts(posts.filter((post) => post.id !== postId));
-    } catch (error) {
-      console.error('게시물 삭제 오류:', error);
-    }
+  const deletePost = (postId: Post['id']) => {
+    deletePostMutation.mutate(postId);
   };
 
   // === 댓글 관련 함수들 === //
@@ -428,113 +431,10 @@ const PostsManager = () => {
     setLimit(parseInt(params.get('limit') || '10'));
     setSearchQuery(params.get('search') || '');
     setSortBy(params.get('sortBy') || '');
-    setSortOrder(params.get('sortOrder') || 'asc');
+    const urlSortOrder = params.get('sortOrder');
+    setSortOrder(urlSortOrder === 'desc' ? 'desc' : 'asc');
     setSelectedTag(params.get('tag') || '');
   }, [location.search]); // ✅ location.search 의존성만 필요
-
-  // 하이라이트 함수 추가
-  const highlightText = (text: string | undefined, highlight: string) => {
-    if (!text) return null;
-    if (!highlight.trim()) {
-      return <span>{text}</span>;
-    }
-    const regex = new RegExp(`(${highlight})`, 'gi');
-    const parts = text.split(regex);
-    return (
-      <span>
-        {parts.map((part, i) =>
-          regex.test(part) ? <mark key={i}>{part}</mark> : <span key={i}>{part}</span>,
-        )}
-      </span>
-    );
-  };
-
-  // 게시물 테이블 렌더링
-  const renderPostTable = () => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-[50px]">ID</TableHead>
-          <TableHead>제목</TableHead>
-          <TableHead className="w-[150px]">작성자</TableHead>
-          <TableHead className="w-[150px]">반응</TableHead>
-          <TableHead className="w-[150px]">작업</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {posts.map((post) => (
-          <TableRow key={post.id}>
-            <TableCell>{post.id}</TableCell>
-            <TableCell>
-              <div className="space-y-1">
-                <div>{highlightText(post.title, searchQuery)}</div>
-
-                <div className="flex flex-wrap gap-1">
-                  {post.tags?.map((tag) => (
-                    <span
-                      key={tag}
-                      className={`px-1 text-[9px] font-semibold rounded-[4px] cursor-pointer ${
-                        selectedTag === tag
-                          ? 'text-white bg-blue-500 hover:bg-blue-600'
-                          : 'text-blue-800 bg-blue-100 hover:bg-blue-200'
-                      }`}
-                      onClick={() => {
-                        setSelectedTag(tag);
-                        updateURL();
-                      }}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </TableCell>
-            <TableCell>
-              <div
-                className="flex items-center space-x-2 cursor-pointer"
-                onClick={() => openUserModal(post.author)}
-              >
-                <img
-                  src={post.author?.image}
-                  alt={post.author?.username}
-                  className="w-8 h-8 rounded-full"
-                />
-                <span>{post.author?.username}</span>
-              </div>
-            </TableCell>
-            <TableCell>
-              <div className="flex items-center gap-2">
-                <ThumbsUp className="w-4 h-4" />
-                <span>{post.reactions?.likes || 0}</span>
-                <ThumbsDown className="w-4 h-4" />
-                <span>{post.reactions?.dislikes || 0}</span>
-              </div>
-            </TableCell>
-            <TableCell>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => openPostDetail(post)}>
-                  <MessageSquare className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedPost(post);
-                    setShowEditDialog(true);
-                  }}
-                >
-                  <Edit2 className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => deletePost(post.id)}>
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
 
   // 댓글 렌더링
   const renderComments = (postId: Post['id'] | undefined) => {
@@ -563,7 +463,9 @@ const PostsManager = () => {
             >
               <div className="flex items-center space-x-2 overflow-hidden">
                 <span className="font-medium truncate">{comment.user.username}:</span>
-                <span className="truncate">{highlightText(comment.body, searchQuery)}</span>
+                <span className="truncate">
+                  {<TextHighlighter text={comment.body} highlight={searchQuery} />}
+                </span>
               </div>
               <div className="flex items-center space-x-1">
                 <Button variant="ghost" size="sm" onClick={() => likeComment(comment.id)}>
@@ -649,7 +551,10 @@ const PostsManager = () => {
                 <SelectItem value="reactions">반응</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={sortOrder} onValueChange={setSortOrder}>
+            <Select
+              value={sortOrder}
+              onValueChange={(value) => setSortOrder(value === 'desc' ? 'desc' : 'asc')}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="정렬 순서" />
               </SelectTrigger>
@@ -661,7 +566,28 @@ const PostsManager = () => {
           </div>
 
           {/* 게시물 테이블 */}
-          {loading ? <div className="flex justify-center p-4">로딩 중...</div> : renderPostTable()}
+
+          <FetchSuspense
+            loadingComponent={<div className="flex justify-center p-4">로딩 중...</div>}
+          >
+            <PostTableContainer
+              filters={{
+                limit,
+                skip,
+                searchQuery,
+                selectedTag,
+                sortBy,
+                sortOrder,
+              }}
+              onTagSelect={setSelectedTag}
+              onURLUpdate={updateURL}
+              onUserModalOpen={openUserModal}
+              onPostDetailOpen={openPostDetail}
+              onPostDelete={deletePost}
+              onEditDialogOpen={setShowEditDialog}
+              onPostSelect={setSelectedPost}
+            />
+          </FetchSuspense>
 
           {/* 페이지네이션 */}
           <div className="flex justify-between items-center">
@@ -804,10 +730,12 @@ const PostsManager = () => {
       <Dialog open={showPostDetailDialog} onOpenChange={setShowPostDetailDialog}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{highlightText(selectedPost?.title, searchQuery)}</DialogTitle>
+            <DialogTitle>
+              {<TextHighlighter text={selectedPost?.title} highlight={searchQuery} />}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p>{highlightText(selectedPost?.body, searchQuery)}</p>
+            <p>{<TextHighlighter text={selectedPost?.body} highlight={searchQuery} />}</p>
             {renderComments(selectedPost?.id)}
           </div>
         </DialogContent>
