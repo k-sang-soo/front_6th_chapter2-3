@@ -16,7 +16,6 @@ import { postQueries } from '../../../../entities/post/queries';
 interface PostTableContainerProps {
   filters: PostRequest;
   onTagSelect: (tag: string) => void;
-  onURLUpdate: () => void;
   onUserModalOpen: (user: PostWithAuthor['author']) => void;
   onPostDetailOpen: (post: Post) => void;
   onPostDelete: (postId: Post['id']) => void;
@@ -27,7 +26,6 @@ interface PostTableContainerProps {
 export const PostTableContainer = ({
   filters,
   onTagSelect,
-  onURLUpdate,
   onUserModalOpen,
   onPostDetailOpen,
   onPostDelete,
@@ -68,7 +66,6 @@ export const PostTableContainer = ({
                       }`}
                       onClick={() => {
                         onTagSelect(tag);
-                        onURLUpdate();
                       }}
                     >
                       {tag}
