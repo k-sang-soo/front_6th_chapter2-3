@@ -288,11 +288,6 @@ const PostsManager = () => {
     }
   };
 
-  // 🚨 문제점 #3: useEffect 의존성 관리 문제 + 복잡한 사이드 이펙트
-  // 👉 개선 방향: 커스텀 훅으로 분리하고 의존성을 명확히 관리
-
-  // useSearchParams로 URL 자동 동기화 - useEffect 불필요
-
   // 댓글 렌더링
   const renderComments = (postId: Post['id'] | undefined) => {
     if (!postId) return null;
