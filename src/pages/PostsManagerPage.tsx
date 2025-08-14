@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '../shared/ui';
-import { Post, PostFormData, PostWithAuthor } from '../entities/post/model';
-import { UserProfile } from '../entities/user/model';
+import { Post, PostFormData } from '../entities/post/model';
 import { Comment, CommentFormData } from '../entities/comment/model';
 import { commentQueries } from '../entities/comment/queries';
 import { tagQueries } from '../entities/tag/queries';
@@ -26,6 +25,7 @@ import { useUserStore } from '../entities/user/store/useUserStore';
 import { usePostFilters } from '../features/post/hooks/usePostFilters';
 import { usePostManagement } from '../features/post/hooks/usePostManagement';
 import { useCommentManagement } from '../features/comment/hooks/useCommentManagement';
+import { useUserManagement } from '../features/user/hooks/useUserManagement';
 
 const PostsManager = () => {
   // Filters Hook
@@ -73,6 +73,9 @@ const PostsManager = () => {
     isUpdating: isUpdatingComment,
   } = useCommentManagement(selectedPost, comments);
 
+  // User Management Hook
+  const { openUserModal } = useUserManagement();
+
   // Comment Store
   const {
     selectedComment,
@@ -88,12 +91,9 @@ const PostsManager = () => {
   const {
     selectedUser,
     modals: userModals,
-    setSelectedUser,
     openProfileModal: openUserProfileModal,
     closeProfileModal: closeUserProfileModal,
   } = useUserStore();
-
-
 
   // === 상태 관리 === //
 
@@ -113,7 +113,6 @@ const PostsManager = () => {
   // 태그 목록 쿼리
   const { data: tagsData } = useQuery(tagQueries.list());
   const tags = tagsData || [];
-
 
   // === 유틸리티 함수 === //
 
@@ -156,23 +155,6 @@ const PostsManager = () => {
   };
 
   // === UI 상호작용 함수들 === //
-
-  /**
-   * 사용자 정보 모달을 여는 함수
-   * 사용자의 상세 정보를 API로 가져온 후 모달에 표시
-   */
-  const openUserModal = async (user: PostWithAuthor['author']) => {
-    try {
-      if (!user || !user.id) return;
-
-      const response = await fetch(`/api/users/${user.id}`);
-      const userData: UserProfile = await response.json();
-      setSelectedUser(userData);
-      openUserProfileModal();
-    } catch (error) {
-      console.error('사용자 정보 가져오기 오류:', error);
-    }
-  };
 
   return (
     <Card className="w-full max-w-6xl mx-auto">
