@@ -1,8 +1,7 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '../shared/ui';
-import { Post, PostFormData, PostWithAuthor, SortOrder } from '../entities/post/model';
+import { Post, PostFormData, PostWithAuthor } from '../entities/post/model';
 import { UserProfile } from '../entities/user/model';
 import { Comment, CommentFormData } from '../entities/comment/model';
 import { useCreatePost, useUpdatePost, useDeletePost } from '../features/post/mutations';
@@ -31,9 +30,11 @@ import { PaginationControl } from '../features/pagination/ui/pagination-control'
 import { usePostStore } from '../entities/post/store/usePostStore';
 import { useCommentStore } from '../entities/comment/store/useCommentStore';
 import { useUserStore } from '../entities/user/store/useUserStore';
+import { usePostFilters } from '../features/post/hooks/usePostFilters';
 
 const PostsManager = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  // Filters Hook
+  const { filters, updateFilters } = usePostFilters();
 
   // Post UI Store
   const {
@@ -83,39 +84,6 @@ const PostsManager = () => {
 
   // 게시물 목록과 관련된 서버 데이터 (현재 PostTableContainer에서 관리)
   const [total] = useState(0); // 전체 게시물 개수 (페이지네이션용) - PostTableContainer로 이동 예정
-
-  // URL 파라미터에서 필터 상태 파싱 (Single Source of Truth)
-  const filters = useMemo(
-    () => ({
-      skip: parseInt(searchParams.get('skip') || '0'),
-      limit: parseInt(searchParams.get('limit') || '10'),
-      searchQuery: searchParams.get('search') || '',
-      sortBy: searchParams.get('sortBy') || '',
-      sortOrder: (searchParams.get('sortOrder') === 'desc' ? 'desc' : 'asc') as SortOrder,
-      selectedTag: searchParams.get('tag') || '',
-    }),
-    [searchParams],
-  );
-
-  // 필터 업데이트 함수
-  const updateFilters = useCallback(
-    (updates: Partial<typeof filters>) => {
-      setSearchParams((prev) => {
-        const newParams = new URLSearchParams(prev);
-
-        Object.entries(updates).forEach(([key, value]) => {
-          if (value === null || value === undefined || value === '') {
-            newParams.delete(key === 'searchQuery' ? 'search' : key);
-          } else {
-            newParams.set(key === 'searchQuery' ? 'search' : key, String(value));
-          }
-        });
-
-        return newParams;
-      });
-    },
-    [setSearchParams],
-  );
 
   // 새로 작성 중인 데이터 (폼 상태)
   const [newPost, setNewPost] = useState<PostFormData>({ title: '', body: '', userId: 1 }); // 새 게시물 작성 폼
