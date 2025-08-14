@@ -1,13 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Plus } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '../shared/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '../shared/ui';
 import { Post, PostFormData, PostWithAuthor, SortOrder } from '../entities/post/model';
 import { UserProfile } from '../entities/user/model';
 import { Comment, CommentFormData } from '../entities/comment/model';
@@ -34,9 +28,45 @@ import { TagFilter } from '../features/post/ui/tag-filter';
 import { SortSelector } from '../features/post/ui/sort-selector';
 import { SortOrderSelector } from '../features/post/ui/sort-order-selector';
 import { PaginationControl } from '../features/pagination/ui/pagination-control';
+import { usePostStore } from '../entities/post/store/usePostStore';
+import { useCommentStore } from '../entities/comment/store/useCommentStore';
+import { useUserStore } from '../entities/user/store/useUserStore';
 
 const PostsManager = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Post UI Store
+  const {
+    selectedPost,
+    modals: postModals,
+    setSelectedPost,
+    openAddModal: openPostAddModal,
+    closeAddModal: closePostAddModal,
+    openEditModal: openPostEditModal,
+    closeEditModal: closePostEditModal,
+    openDetailModal: openPostDetailModal,
+    closeDetailModal: closePostDetailModal,
+  } = usePostStore();
+
+  // Comment Store
+  const {
+    selectedComment,
+    modals: commentModals,
+    setSelectedComment,
+    openAddModal: openCommentAddModal,
+    closeAddModal: closeCommentAddModal,
+    openEditModal: openCommentEditModal,
+    closeEditModal: closeCommentEditModal,
+  } = useCommentStore();
+
+  // User Store
+  const {
+    selectedUser,
+    modals: userModals,
+    setSelectedUser,
+    openProfileModal: openUserProfileModal,
+    closeProfileModal: closeUserProfileModal,
+  } = useUserStore();
 
   // TanStack Query mutations
   const createPostMutation = useCreatePost();
@@ -87,11 +117,6 @@ const PostsManager = () => {
     [setSearchParams],
   );
 
-  // 현재 선택/편집 중인 항목들
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null); // 상세보기나 수정할 게시물
-  const [selectedComment, setSelectedComment] = useState<Comment | null>(null); // 수정할 댓글
-  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null); // 프로필을 볼 사용자
-
   // 새로 작성 중인 데이터 (폼 상태)
   const [newPost, setNewPost] = useState<PostFormData>({ title: '', body: '', userId: 1 }); // 새 게시물 작성 폼
   const [newComment, setNewComment] = useState<CommentFormData>({
@@ -99,14 +124,6 @@ const PostsManager = () => {
     postId: 1,
     userId: 1,
   }); // 새 댓글 작성 폼
-
-  // UI 모달/다이얼로그 표시 여부 제어
-  const [showAddDialog, setShowAddDialog] = useState(false); // 게시물 추가 다이얼로그
-  const [showEditDialog, setShowEditDialog] = useState(false); // 게시물 수정 다이얼로그
-  const [showAddCommentDialog, setShowAddCommentDialog] = useState(false); // 댓글 추가 다이얼로그
-  const [showEditCommentDialog, setShowEditCommentDialog] = useState(false); // 댓글 수정 다이얼로그
-  const [showPostDetailDialog, setShowPostDetailDialog] = useState(false); // 게시물 상세보기 다이얼로그
-  const [showUserModal, setShowUserModal] = useState(false); // 사용자 정보 모달
 
   // === TanStack Query로 데이터 가져오기 === //
 
@@ -134,7 +151,7 @@ const PostsManager = () => {
   const addPost = () => {
     createPostMutation.mutate(newPost, {
       onSuccess: () => {
-        setShowAddDialog(false);
+        closePostAddModal();
         setNewPost({ title: '', body: '', userId: 1 });
       },
     });
@@ -157,7 +174,7 @@ const PostsManager = () => {
       { postId, postData },
       {
         onSuccess: () => {
-          setShowEditDialog(false);
+          closePostEditModal();
         },
       },
     );
@@ -180,7 +197,7 @@ const PostsManager = () => {
   const addComment = (newComment: CommentFormData) => {
     createCommentMutation.mutate(newComment, {
       onSuccess: () => {
-        setShowAddCommentDialog(false);
+        closeCommentAddModal();
         setNewComment({ body: '', postId: 1, userId: 1 });
       },
     });
@@ -199,7 +216,7 @@ const PostsManager = () => {
       { commentId, commentData },
       {
         onSuccess: () => {
-          setShowEditCommentDialog(false);
+          closeCommentEditModal();
         },
       },
     );
@@ -249,7 +266,7 @@ const PostsManager = () => {
    */
   const openPostDetail = (post: Post) => {
     setSelectedPost(post);
-    setShowPostDetailDialog(true);
+    openPostDetailModal();
   };
 
   /**
@@ -263,19 +280,18 @@ const PostsManager = () => {
       const response = await fetch(`/api/users/${user.id}`);
       const userData: UserProfile = await response.json();
       setSelectedUser(userData);
-      setShowUserModal(true);
+      openUserProfileModal();
     } catch (error) {
       console.error('사용자 정보 가져오기 오류:', error);
     }
   };
-
 
   return (
     <Card className="w-full max-w-6xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>게시물 관리자</span>
-          <Button onClick={() => setShowAddDialog(true)}>
+          <Button onClick={openPostAddModal}>
             <Plus className="w-4 h-4 mr-2" />
             게시물 추가
           </Button>
@@ -305,7 +321,6 @@ const PostsManager = () => {
           </div>
 
           {/* 게시물 테이블 */}
-
           <FetchSuspense
             loadingComponent={<div className="flex justify-center p-4">로딩 중...</div>}
           >
@@ -315,7 +330,7 @@ const PostsManager = () => {
               onUserModalOpen={openUserModal}
               onPostDetailOpen={openPostDetail}
               onPostDelete={deletePost}
-              onEditDialogOpen={setShowEditDialog}
+              onEditDialogOpen={() => openPostEditModal()}
               onPostSelect={setSelectedPost}
             />
           </FetchSuspense>
@@ -333,8 +348,8 @@ const PostsManager = () => {
 
       {/* 게시물 추가 대화상자 */}
       <CreatePostForm
-        open={showAddDialog}
-        onOpenChange={setShowAddDialog}
+        open={postModals.add}
+        onOpenChange={(open) => (open ? openPostAddModal() : closePostAddModal())}
         formData={newPost}
         onFormDataChange={setNewPost}
         onSubmit={addPost}
@@ -343,8 +358,8 @@ const PostsManager = () => {
 
       {/* 게시물 수정 대화상자 */}
       <EditPostForm
-        open={showEditDialog}
-        onOpenChange={setShowEditDialog}
+        open={postModals.edit}
+        onOpenChange={(open) => (open ? openPostEditModal() : closePostEditModal())}
         post={selectedPost}
         onPostChange={setSelectedPost}
         onSubmit={updatePost}
@@ -353,8 +368,8 @@ const PostsManager = () => {
 
       {/* 댓글 추가 대화상자 */}
       <CreateCommentForm
-        open={showAddCommentDialog}
-        onOpenChange={setShowAddCommentDialog}
+        open={commentModals.add}
+        onOpenChange={(open) => (open ? openCommentAddModal() : closeCommentAddModal())}
         formData={newComment}
         onFormDataChange={setNewComment}
         onSubmit={addComment}
@@ -363,8 +378,8 @@ const PostsManager = () => {
 
       {/* 댓글 수정 대화상자 */}
       <EditCommentForm
-        open={showEditCommentDialog}
-        onOpenChange={setShowEditCommentDialog}
+        open={commentModals.edit}
+        onOpenChange={(open) => (open ? openCommentEditModal() : closeCommentEditModal())}
         comment={selectedComment}
         onCommentChange={setSelectedComment}
         onSubmit={(commentId, body) => updateComment(commentId, { body })}
@@ -373,18 +388,18 @@ const PostsManager = () => {
 
       {/* 게시물 상세 보기 대화상자 */}
       <PostDetail
-        open={showPostDetailDialog}
-        onOpenChange={setShowPostDetailDialog}
+        open={postModals.detail}
+        onOpenChange={(open) => (open ? openPostDetailModal() : closePostDetailModal())}
         post={selectedPost}
         comments={comments}
         searchQuery={filters.searchQuery}
         onAddComment={(postId) => {
           setNewComment((prev) => ({ ...prev, postId }));
-          setShowAddCommentDialog(true);
+          openCommentAddModal();
         }}
         onEditComment={(comment) => {
           setSelectedComment(comment);
-          setShowEditCommentDialog(true);
+          openCommentEditModal();
         }}
         onDeleteComment={deleteComment}
         onLikeComment={likeComment}
@@ -392,8 +407,8 @@ const PostsManager = () => {
 
       {/* 사용자 모달 */}
       <UserProfileModal
-        open={showUserModal}
-        onOpenChange={setShowUserModal}
+        open={userModals.profile}
+        onOpenChange={(open) => (open ? openUserProfileModal() : closeUserProfileModal())}
         user={selectedUser}
       />
     </Card>
