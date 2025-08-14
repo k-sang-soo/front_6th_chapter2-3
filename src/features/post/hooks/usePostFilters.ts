@@ -37,10 +37,13 @@ export const usePostFilters = () => {
         const newParams = new URLSearchParams(prev);
 
         Object.entries(updates).forEach(([key, value]) => {
+          const paramKey = key === 'searchQuery' ? 'search' : 
+                          key === 'selectedTag' ? 'tag' : key;
+          
           if (value === null || value === undefined || value === '') {
-            newParams.delete(key === 'searchQuery' ? 'search' : key);
+            newParams.delete(paramKey);
           } else {
-            newParams.set(key === 'searchQuery' ? 'search' : key, String(value));
+            newParams.set(paramKey, String(value));
           }
         });
 

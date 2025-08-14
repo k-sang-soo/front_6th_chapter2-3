@@ -23,7 +23,7 @@ export const TagFilter = ({
   className = "w-[180px]",
 }: TagFilterProps) => {
   return (
-    <Select value={selectedTag} onValueChange={onTagChange}>
+    <Select value={selectedTag || 'all'} onValueChange={onTagChange}>
       <SelectTrigger className={className}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>

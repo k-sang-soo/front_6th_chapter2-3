@@ -160,7 +160,7 @@ const PostsManager = () => {
             <TagFilter
               selectedTag={filters.selectedTag}
               tags={tags}
-              onTagChange={(tag) => updateFilters({ selectedTag: tag })}
+              onTagChange={(tag) => updateFilters({ selectedTag: tag === 'all' ? '' : tag })}
             />
             <SortSelector
               sortBy={filters.sortBy as SortByType}
