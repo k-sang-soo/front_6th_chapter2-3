@@ -12,7 +12,7 @@ interface TagFilterProps {
   tags: Tag[];
   onTagChange: (tag: string) => void;
   placeholder?: string;
-  width?: string;
+  className?: string;
 }
 
 export const TagFilter = ({
@@ -20,11 +20,11 @@ export const TagFilter = ({
   tags,
   onTagChange,
   placeholder = "태그 선택",
-  width = "w-[180px]",
+  className = "w-[180px]",
 }: TagFilterProps) => {
   return (
     <Select value={selectedTag} onValueChange={onTagChange}>
-      <SelectTrigger className={width}>
+      <SelectTrigger className={className}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
