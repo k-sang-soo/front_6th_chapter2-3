@@ -29,10 +29,15 @@ export const getPostsWithAuthors = async (params: PostRequest) => {
   ]);
 
   // 작성자 정보 결합
-  return postsData.posts.map((post) => ({
+  const postsWithAuthors = postsData.posts.map((post) => ({
     ...post,
     author: usersData.users.find((user) => user.id === post.userId),
   }));
+
+  return {
+    posts: postsWithAuthors,
+    total: postsData.total,
+  };
 };
 
 // 게시물 생성

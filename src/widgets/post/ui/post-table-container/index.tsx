@@ -11,6 +11,7 @@ import {
 import { Edit2, MessageSquare, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
 import { Post, PostWithAuthor, PostRequest } from '../../../../entities/post/model';
 import { useSuspenseQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { postQueries } from '../../../../entities/post/queries';
 
 interface PostTableContainerProps {
@@ -21,6 +22,7 @@ interface PostTableContainerProps {
   onPostDelete: (postId: Post['id']) => void;
   onEditDialogOpen: (show: boolean) => void;
   onPostSelect: (post: Post) => void;
+  onTotalChange: (total: number) => void;
 }
 
 export const PostTableContainer = ({
@@ -31,8 +33,15 @@ export const PostTableContainer = ({
   onPostDelete,
   onEditDialogOpen,
   onPostSelect,
+  onTotalChange,
 }: PostTableContainerProps) => {
-  const { data: posts } = useSuspenseQuery(postQueries.postsWithAuthors(filters));
+  const { data } = useSuspenseQuery(postQueries.postsWithAuthors(filters));
+  const posts = data.posts;
+
+  // total 값이 변경되면 상위 컴포넌트에 알림
+  useEffect(() => {
+    onTotalChange(data.total);
+  }, [data.total, onTotalChange]);
 
   return (
     <Table>

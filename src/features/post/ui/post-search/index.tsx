@@ -14,9 +14,9 @@ export const PostSearch = ({
   onSearchSubmit,
   placeholder = "게시물 검색...",
 }: PostSearchProps) => {
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && onSearchSubmit) {
-      onSearchSubmit(searchQuery);
+      onSearchSubmit(e.currentTarget.value);
     }
   };
 

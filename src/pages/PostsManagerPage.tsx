@@ -28,7 +28,7 @@ import { useUserManagement } from '../features/user/hooks/useUserManagement';
 
 const PostsManager = () => {
   // Filters Hook
-  const { filters, updateFilters, total } = usePostFilters();
+  const { filters, updateFilters, total, setTotal } = usePostFilters();
 
   // Post Management Hook
   const {
@@ -184,6 +184,7 @@ const PostsManager = () => {
               onPostDelete={handleDeletePost}
               onEditDialogOpen={() => openPostEditModal()}
               onPostSelect={setSelectedPost}
+              onTotalChange={setTotal}
             />
           </FetchSuspense>
 
