@@ -1,7 +1,6 @@
-import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '../shared/ui';
-import { Post, PostFormData } from '../entities/post/model';
+import { Post } from '../entities/post/model';
 import { Comment, CommentFormData } from '../entities/comment/model';
 import { commentQueries } from '../entities/comment/queries';
 import { tagQueries } from '../entities/tag/queries';
@@ -29,14 +28,16 @@ import { useUserManagement } from '../features/user/hooks/useUserManagement';
 
 const PostsManager = () => {
   // Filters Hook
-  const { filters, updateFilters } = usePostFilters();
+  const { filters, updateFilters, total } = usePostFilters();
 
   // Post Management Hook
   const {
-    addPost: handleAddPost,
+    addPost,
     updatePost: handleUpdatePost,
     deletePost: handleDeletePost,
     openPostDetail,
+    newPost,
+    setNewPost,
     isCreating,
     isUpdating,
   } = usePostManagement();
@@ -65,10 +66,12 @@ const PostsManager = () => {
 
   // Comment Management Hook
   const {
-    addComment: handleAddComment,
+    addComment,
     updateComment: handleUpdateComment,
     deleteComment: handleDeleteComment,
     likeComment: handleLikeComment,
+    newComment,
+    setNewComment,
     isCreating: isCreatingComment,
     isUpdating: isUpdatingComment,
   } = useCommentManagement(selectedPost, comments);
@@ -96,17 +99,7 @@ const PostsManager = () => {
   } = useUserStore();
 
   // === 상태 관리 === //
-
-  // 게시물 목록과 관련된 서버 데이터 (현재 PostTableContainer에서 관리)
-  const [total] = useState(0); // 전체 게시물 개수 (페이지네이션용) - PostTableContainer로 이동 예정
-
-  // 새로 작성 중인 데이터 (폼 상태)
-  const [newPost, setNewPost] = useState<PostFormData>({ title: '', body: '', userId: 1 }); // 새 게시물 작성 폼
-  const [newComment, setNewComment] = useState<CommentFormData>({
-    body: '',
-    postId: 1,
-    userId: 1,
-  }); // 새 댓글 작성 폼
+  // 폼 상태들은 이제 각각의 hook에서 관리됨
 
   // === TanStack Query로 데이터 가져오기 === //
 
@@ -116,12 +109,7 @@ const PostsManager = () => {
 
   // === 유틸리티 함수 === //
 
-  // Post CRUD actions
-  const addPost = () => {
-    handleAddPost(newPost, () => {
-      setNewPost({ title: '', body: '', userId: 1 });
-    });
-  };
+  // Post CRUD actions - hook에서 직접 처리됨
 
   const updatePost = (postId: Post['id']) => {
     if (!selectedPost) return;
@@ -136,12 +124,6 @@ const PostsManager = () => {
   };
 
   // Comment CRUD actions
-  const addComment = (newComment: CommentFormData) => {
-    handleAddComment(newComment, () => {
-      setNewComment({ body: '', postId: 1, userId: 1 });
-    });
-  };
-
   const updateComment = (commentId: Comment['id'], commentData: Pick<CommentFormData, 'body'>) => {
     handleUpdateComment(commentId, commentData);
   };
@@ -242,7 +224,7 @@ const PostsManager = () => {
         onOpenChange={(open) => (open ? openCommentAddModal() : closeCommentAddModal())}
         formData={newComment}
         onFormDataChange={setNewComment}
-        onSubmit={addComment}
+        onSubmit={(commentData) => addComment(commentData)}
         isLoading={isCreatingComment}
       />
 

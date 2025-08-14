@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Post, PostFormData } from '../../../entities/post/model';
 import { usePostStore } from '../../../entities/post/store/usePostStore';
 import { useCreatePost, useUpdatePost, useDeletePost } from '../mutations';
@@ -10,15 +11,22 @@ export const usePostManagement = () => {
     closeEditModal: closePostEditModal,
   } = usePostStore();
 
+  // 새 게시물 폼 상태
+  const [newPost, setNewPost] = useState<PostFormData>({ 
+    title: '', 
+    body: '', 
+    userId: 1 
+  });
+
   const createPostMutation = useCreatePost();
   const updatePostMutation = useUpdatePost();
   const deletePostMutation = useDeletePost();
 
-  const addPost = (formData: PostFormData, onSuccess?: () => void) => {
-    createPostMutation.mutate(formData, {
+  const addPost = () => {
+    createPostMutation.mutate(newPost, {
       onSuccess: () => {
         closePostAddModal();
-        onSuccess?.();
+        setNewPost({ title: '', body: '', userId: 1 });
       },
     });
   };
@@ -50,6 +58,10 @@ export const usePostManagement = () => {
     updatePost,
     deletePost,
     openPostDetail,
+
+    // Form state
+    newPost,
+    setNewPost,
 
     // Loading states
     isCreating: createPostMutation.isPending,

@@ -1,29 +1,39 @@
+import { useState } from 'react';
 import { Comment, CommentFormData } from '../../../entities/comment/model';
 import { Post } from '../../../entities/post/model';
 import { useCommentStore } from '../../../entities/comment/store/useCommentStore';
 import { useCreateComment, useUpdateComment, useDeleteComment, useLikeComment } from '../mutations';
 
 export const useCommentManagement = (selectedPost: Post | null, comments: Comment[]) => {
-  const {
-    closeAddModal: closeCommentAddModal,
-    closeEditModal: closeCommentEditModal,
-  } = useCommentStore();
+  const { closeAddModal: closeCommentAddModal, closeEditModal: closeCommentEditModal } =
+    useCommentStore();
+
+  // 새 댓글 폼 상태
+  const [newComment, setNewComment] = useState<CommentFormData>({
+    body: '',
+    postId: 1,
+    userId: 1,
+  });
 
   const createCommentMutation = useCreateComment();
   const updateCommentMutation = useUpdateComment();
   const deleteCommentMutation = useDeleteComment();
   const likeCommentMutation = useLikeComment();
 
-  const addComment = (commentData: CommentFormData, onSuccess?: () => void) => {
+  const addComment = (commentData: CommentFormData) => {
     createCommentMutation.mutate(commentData, {
       onSuccess: () => {
         closeCommentAddModal();
-        onSuccess?.();
+        setNewComment({ body: '', postId: 1, userId: 1 });
       },
     });
   };
 
-  const updateComment = (commentId: Comment['id'], commentData: Pick<CommentFormData, 'body'>, onSuccess?: () => void) => {
+  const updateComment = (
+    commentId: Comment['id'],
+    commentData: Pick<CommentFormData, 'body'>,
+    onSuccess?: () => void,
+  ) => {
     if (!commentId) return;
 
     updateCommentMutation.mutate(
@@ -70,6 +80,10 @@ export const useCommentManagement = (selectedPost: Post | null, comments: Commen
     updateComment,
     deleteComment,
     likeComment,
+
+    // Form state
+    newComment,
+    setNewComment,
 
     // Loading states
     isCreating: createCommentMutation.isPending,

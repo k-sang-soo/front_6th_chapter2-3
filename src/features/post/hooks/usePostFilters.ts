@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SortOrder } from '../../../entities/post/model';
 
@@ -13,6 +13,9 @@ export interface PostFilters {
 
 export const usePostFilters = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  
+  // 전체 게시물 개수 (페이지네이션용)
+  const [total, setTotal] = useState(0);
 
   // URL 파라미터에서 필터 상태 파싱 (Single Source of Truth)
   const filters = useMemo(
@@ -50,5 +53,7 @@ export const usePostFilters = () => {
   return {
     filters,
     updateFilters,
+    total,
+    setTotal,
   };
 };
