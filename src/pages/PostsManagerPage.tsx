@@ -4,7 +4,6 @@ import { Button, Card, CardContent, CardHeader, CardTitle } from '../shared/ui';
 import { Post, PostFormData, PostWithAuthor } from '../entities/post/model';
 import { UserProfile } from '../entities/user/model';
 import { Comment, CommentFormData } from '../entities/comment/model';
-import { useCreatePost, useUpdatePost, useDeletePost } from '../features/post/mutations';
 import {
   useCreateComment,
   useUpdateComment,
@@ -31,10 +30,21 @@ import { usePostStore } from '../entities/post/store/usePostStore';
 import { useCommentStore } from '../entities/comment/store/useCommentStore';
 import { useUserStore } from '../entities/user/store/useUserStore';
 import { usePostFilters } from '../features/post/hooks/usePostFilters';
+import { usePostManagement } from '../features/post/hooks/usePostManagement';
 
 const PostsManager = () => {
   // Filters Hook
   const { filters, updateFilters } = usePostFilters();
+
+  // Post Management Hook
+  const {
+    addPost: handleAddPost,
+    updatePost: handleUpdatePost,
+    deletePost: handleDeletePost,
+    openPostDetail,
+    isCreating,
+    isUpdating,
+  } = usePostManagement();
 
   // Post UI Store
   const {
@@ -69,10 +79,6 @@ const PostsManager = () => {
     closeProfileModal: closeUserProfileModal,
   } = useUserStore();
 
-  // TanStack Query mutations
-  const createPostMutation = useCreatePost();
-  const updatePostMutation = useUpdatePost();
-  const deletePostMutation = useDeletePost();
 
   // Comment mutations
   const createCommentMutation = useCreateComment();
@@ -110,25 +116,13 @@ const PostsManager = () => {
 
   // === 유틸리티 함수 === //
 
-  // === 게시물 CRUD 함수들 === //
-
-  /**
-   * 새 게시물을 생성하는 함수
-   * 성공하면 쿼리 캐시가 자동으로 무효화되어 목록이 새로고침됨
-   */
+  // Post CRUD actions
   const addPost = () => {
-    createPostMutation.mutate(newPost, {
-      onSuccess: () => {
-        closePostAddModal();
-        setNewPost({ title: '', body: '', userId: 1 });
-      },
+    handleAddPost(newPost, () => {
+      setNewPost({ title: '', body: '', userId: 1 });
     });
   };
 
-  /**
-   * 선택된 게시물을 수정하는 함수
-   * 성공하면 쿼리 캐시가 자동으로 무효화되어 목록이 새로고침됨
-   */
   const updatePost = (postId: Post['id']) => {
     if (!selectedPost) return;
 
@@ -138,22 +132,7 @@ const PostsManager = () => {
       userId: selectedPost.userId,
     };
 
-    updatePostMutation.mutate(
-      { postId, postData },
-      {
-        onSuccess: () => {
-          closePostEditModal();
-        },
-      },
-    );
-  };
-
-  /**
-   * 게시물을 삭제하는 함수
-   * 성공하면 쿼리 캐시가 자동으로 무효화되어 목록이 새로고침됨
-   */
-  const deletePost = (postId: Post['id']) => {
-    deletePostMutation.mutate(postId);
+    handleUpdatePost(postId, postData);
   };
 
   // === 댓글 관련 함수들 === //
@@ -229,15 +208,6 @@ const PostsManager = () => {
   // === UI 상호작용 함수들 === //
 
   /**
-   * 게시물 상세보기 다이얼로그를 여는 함수
-   * 선택된 게시물을 설정하면 댓글이 자동으로 로드됨
-   */
-  const openPostDetail = (post: Post) => {
-    setSelectedPost(post);
-    openPostDetailModal();
-  };
-
-  /**
    * 사용자 정보 모달을 여는 함수
    * 사용자의 상세 정보를 API로 가져온 후 모달에 표시
    */
@@ -297,7 +267,7 @@ const PostsManager = () => {
               onTagSelect={(tag) => updateFilters({ selectedTag: tag })}
               onUserModalOpen={openUserModal}
               onPostDetailOpen={openPostDetail}
-              onPostDelete={deletePost}
+              onPostDelete={handleDeletePost}
               onEditDialogOpen={() => openPostEditModal()}
               onPostSelect={setSelectedPost}
             />
@@ -321,7 +291,7 @@ const PostsManager = () => {
         formData={newPost}
         onFormDataChange={setNewPost}
         onSubmit={addPost}
-        isLoading={createPostMutation.isPending}
+        isLoading={isCreating}
       />
 
       {/* 게시물 수정 대화상자 */}
@@ -331,7 +301,7 @@ const PostsManager = () => {
         post={selectedPost}
         onPostChange={setSelectedPost}
         onSubmit={updatePost}
-        isLoading={updatePostMutation.isPending}
+        isLoading={isUpdating}
       />
 
       {/* 댓글 추가 대화상자 */}
