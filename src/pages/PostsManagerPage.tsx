@@ -1,21 +1,5 @@
-/**
- * 📚 PostsManagerPage.tsx - 리팩토링 학습용 레거시 코드
- *
- * 🚨 현재 상태: 726줄의 거대한 모놀리식 컴포넌트 (안티패턴)
- *
- * 주요 문제점들:
- * 1. 하나의 컴포넌트가 너무 많은 책임을 가짐 (SRP 위반)
- * 2. 17개의 상태 변수가 무질서하게 관리됨
- * 3. 비즈니스 로직과 UI 로직이 섞임
- * 4. 적절한 TypeScript 타이핑 부족
- * 5. 재사용 불가능한 구조
- *
- * 🎯 학습 목표: 이 코드를 FSD 아키텍처로 리팩토링하면서
- * 관심사 분리, 상태 관리, 컴포넌트 분해 원칙을 익히기
- */
-
 import { useState, useMemo, useCallback } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Button,
@@ -23,18 +7,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
-  TextHighlighter,
 } from '../shared/ui';
 import { Post, PostFormData, PostWithAuthor, SortOrder } from '../entities/post/model';
 import { UserProfile } from '../entities/user/model';
@@ -51,7 +23,17 @@ import { tagQueries } from '../entities/tag/queries';
 import { useQuery } from '@tanstack/react-query';
 import FetchSuspense from '../shared/ui/boundaries/fetch-suspense/FetchSuspense.tsx';
 import { PostTableContainer } from '../widgets/post/ui/post-table-container';
-import { CommentList } from '../widgets/comment/ui';
+import { CreatePostForm } from '../features/post/ui/create-post-form';
+import { EditPostForm } from '../features/post/ui/edit-post-form';
+import { PostDetail } from '../features/post/ui/post-detail';
+import { CreateCommentForm } from '../features/comment/ui/create-comment-form';
+import { EditCommentForm } from '../features/comment/ui/edit-comment-form';
+import { UserProfile as UserProfileModal } from '../features/user/ui/user-profile';
+import { PostSearch } from '../features/post/ui/post-search';
+import { TagFilter } from '../features/post/ui/tag-filter';
+import { SortSelector } from '../features/post/ui/sort-selector';
+import { SortOrderSelector } from '../features/post/ui/sort-order-selector';
+import { PaginationControl } from '../features/pagination/ui/pagination-control';
 
 const PostsManager = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -303,64 +285,23 @@ const PostsManager = () => {
         <div className="flex flex-col gap-4">
           {/* 검색 및 필터 컨트롤 */}
           <div className="flex gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="게시물 검색..."
-                  className="pl-8"
-                  value={filters.searchQuery}
-                  onChange={(e) => updateFilters({ searchQuery: e.target.value })}
-                  onKeyDown={(e) =>
-                    e.key === 'Enter' && console.log('Enter 검색: PostTableContainer에서 처리')
-                  }
-                />
-              </div>
-            </div>
-            <Select
-              value={filters.selectedTag}
-              onValueChange={(value) => updateFilters({ selectedTag: value })}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="태그 선택" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">모든 태그</SelectItem>
-                {tags.map((tag) => (
-                  <SelectItem key={tag.url} value={tag.slug}>
-                    {tag.slug}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={filters.sortBy}
-              onValueChange={(value) => updateFilters({ sortBy: value })}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="정렬 기준" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">없음</SelectItem>
-                <SelectItem value="id">ID</SelectItem>
-                <SelectItem value="title">제목</SelectItem>
-                <SelectItem value="reactions">반응</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={filters.sortOrder}
-              onValueChange={(value) =>
-                updateFilters({ sortOrder: value === 'desc' ? 'desc' : 'asc' })
-              }
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="정렬 순서" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="asc">오름차순</SelectItem>
-                <SelectItem value="desc">내림차순</SelectItem>
-              </SelectContent>
-            </Select>
+            <PostSearch
+              searchQuery={filters.searchQuery}
+              onSearchChange={(query) => updateFilters({ searchQuery: query })}
+            />
+            <TagFilter
+              selectedTag={filters.selectedTag}
+              tags={tags}
+              onTagChange={(tag) => updateFilters({ selectedTag: tag })}
+            />
+            <SortSelector
+              sortBy={filters.sortBy as any}
+              onSortChange={(sortBy) => updateFilters({ sortBy })}
+            />
+            <SortOrderSelector
+              sortOrder={filters.sortOrder}
+              onSortOrderChange={(sortOrder) => updateFilters({ sortOrder })}
+            />
           </div>
 
           {/* 게시물 테이블 */}
@@ -380,218 +321,81 @@ const PostsManager = () => {
           </FetchSuspense>
 
           {/* 페이지네이션 */}
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <span>표시</span>
-              <Select
-                value={filters.limit.toString()}
-                onValueChange={(value) => updateFilters({ limit: Number(value) })}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="10" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="20">20</SelectItem>
-                  <SelectItem value="30">30</SelectItem>
-                </SelectContent>
-              </Select>
-              <span>항목</span>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                disabled={filters.skip === 0}
-                onClick={() => updateFilters({ skip: Math.max(0, filters.skip - filters.limit) })}
-              >
-                이전
-              </Button>
-              <Button
-                disabled={filters.skip + filters.limit >= total}
-                onClick={() => updateFilters({ skip: filters.skip + filters.limit })}
-              >
-                다음
-              </Button>
-            </div>
-          </div>
+          <PaginationControl
+            total={total}
+            skip={filters.skip}
+            limit={filters.limit}
+            onLimitChange={(limit) => updateFilters({ limit, skip: 0 })}
+            onSkipChange={(skip) => updateFilters({ skip })}
+          />
         </div>
       </CardContent>
 
       {/* 게시물 추가 대화상자 */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>새 게시물 추가</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              placeholder="제목"
-              value={newPost.title}
-              onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-            />
-            <Textarea
-              rows={30}
-              placeholder="내용"
-              value={newPost.body}
-              onChange={(e) => setNewPost({ ...newPost, body: e.target.value })}
-            />
-            <Input
-              type="number"
-              placeholder="사용자 ID"
-              value={newPost.userId}
-              onChange={(e) => setNewPost({ ...newPost, userId: Number(e.target.value) })}
-            />
-            <Button onClick={addPost}>게시물 추가</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CreatePostForm
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        formData={newPost}
+        onFormDataChange={setNewPost}
+        onSubmit={addPost}
+        isLoading={createPostMutation.isPending}
+      />
 
       {/* 게시물 수정 대화상자 */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>게시물 수정</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              placeholder="제목"
-              value={selectedPost?.title || ''}
-              onChange={(e) => {
-                if (!selectedPost) return;
-                setSelectedPost({ ...selectedPost, title: e.target.value });
-              }}
-            />
-            <Textarea
-              rows={15}
-              placeholder="내용"
-              value={selectedPost?.body || ''}
-              onChange={(e) => {
-                if (!selectedPost) return;
-                setSelectedPost({ ...selectedPost, body: e.target.value });
-              }}
-            />
-            <Button
-              onClick={() => {
-                if (!selectedPost || !selectedPost.id) return;
-                updatePost(selectedPost.id);
-              }}
-            >
-              게시물 업데이트
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <EditPostForm
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        post={selectedPost}
+        onPostChange={setSelectedPost}
+        onSubmit={updatePost}
+        isLoading={updatePostMutation.isPending}
+      />
 
       {/* 댓글 추가 대화상자 */}
-      <Dialog open={showAddCommentDialog} onOpenChange={setShowAddCommentDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>새 댓글 추가</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="댓글 내용"
-              value={newComment.body}
-              onChange={(e) => setNewComment({ ...newComment, body: e.target.value })}
-            />
-            <Button onClick={() => addComment(newComment)}>댓글 추가</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CreateCommentForm
+        open={showAddCommentDialog}
+        onOpenChange={setShowAddCommentDialog}
+        formData={newComment}
+        onFormDataChange={setNewComment}
+        onSubmit={addComment}
+        isLoading={createCommentMutation.isPending}
+      />
 
       {/* 댓글 수정 대화상자 */}
-      <Dialog open={showEditCommentDialog} onOpenChange={setShowEditCommentDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>댓글 수정</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="댓글 내용"
-              value={selectedComment?.body || ''}
-              onChange={(e) => {
-                if (!selectedComment) return;
-                setSelectedComment({ ...selectedComment, body: e.target.value });
-              }}
-            />
-            <Button
-              onClick={() => {
-                if (!selectedComment || !selectedComment.id) return;
-                updateComment(selectedComment.id, { body: selectedComment.body });
-              }}
-            >
-              댓글 업데이트
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <EditCommentForm
+        open={showEditCommentDialog}
+        onOpenChange={setShowEditCommentDialog}
+        comment={selectedComment}
+        onCommentChange={setSelectedComment}
+        onSubmit={(commentId, body) => updateComment(commentId, { body })}
+        isLoading={updateCommentMutation.isPending}
+      />
 
       {/* 게시물 상세 보기 대화상자 */}
-      <Dialog open={showPostDetailDialog} onOpenChange={setShowPostDetailDialog}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>
-              {<TextHighlighter text={selectedPost?.title} highlight={filters.searchQuery} />}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p>{<TextHighlighter text={selectedPost?.body} highlight={filters.searchQuery} />}</p>
-            <CommentList
-              postId={selectedPost?.id}
-              comments={comments}
-              searchQuery={filters.searchQuery}
-              onAddComment={(postId) => {
-                setNewComment((prev) => ({ ...prev, postId }));
-                setShowAddCommentDialog(true);
-              }}
-              onEditComment={(comment) => {
-                setSelectedComment(comment);
-                setShowEditCommentDialog(true);
-              }}
-              onDeleteComment={deleteComment}
-              onLikeComment={likeComment}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <PostDetail
+        open={showPostDetailDialog}
+        onOpenChange={setShowPostDetailDialog}
+        post={selectedPost}
+        comments={comments}
+        searchQuery={filters.searchQuery}
+        onAddComment={(postId) => {
+          setNewComment((prev) => ({ ...prev, postId }));
+          setShowAddCommentDialog(true);
+        }}
+        onEditComment={(comment) => {
+          setSelectedComment(comment);
+          setShowEditCommentDialog(true);
+        }}
+        onDeleteComment={deleteComment}
+        onLikeComment={likeComment}
+      />
 
       {/* 사용자 모달 */}
-      <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>사용자 정보</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <img
-              src={selectedUser?.image}
-              alt={selectedUser?.username}
-              className="w-24 h-24 rounded-full mx-auto"
-            />
-            <h3 className="text-xl font-semibold text-center">{selectedUser?.username}</h3>
-            <div className="space-y-2">
-              <p>
-                <strong>이름:</strong> {selectedUser?.firstName} {selectedUser?.lastName}
-              </p>
-              <p>
-                <strong>나이:</strong> {selectedUser?.age}
-              </p>
-              <p>
-                <strong>이메일:</strong> {selectedUser?.email}
-              </p>
-              <p>
-                <strong>전화번호:</strong> {selectedUser?.phone}
-              </p>
-              <p>
-                <strong>주소:</strong> {selectedUser?.address?.address},{' '}
-                {selectedUser?.address?.city}, {selectedUser?.address?.state}
-              </p>
-              <p>
-                <strong>직장:</strong> {selectedUser?.company?.name} -{' '}
-                {selectedUser?.company?.title}
-              </p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <UserProfileModal
+        open={showUserModal}
+        onOpenChange={setShowUserModal}
+        user={selectedUser}
+      />
     </Card>
   );
 };
