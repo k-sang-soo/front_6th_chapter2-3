@@ -4,12 +4,6 @@ import { Button, Card, CardContent, CardHeader, CardTitle } from '../shared/ui';
 import { Post, PostFormData, PostWithAuthor } from '../entities/post/model';
 import { UserProfile } from '../entities/user/model';
 import { Comment, CommentFormData } from '../entities/comment/model';
-import {
-  useCreateComment,
-  useUpdateComment,
-  useDeleteComment,
-  useLikeComment,
-} from '../features/comment/mutations';
 import { commentQueries } from '../entities/comment/queries';
 import { tagQueries } from '../entities/tag/queries';
 import { useQuery } from '@tanstack/react-query';
@@ -31,6 +25,7 @@ import { useCommentStore } from '../entities/comment/store/useCommentStore';
 import { useUserStore } from '../entities/user/store/useUserStore';
 import { usePostFilters } from '../features/post/hooks/usePostFilters';
 import { usePostManagement } from '../features/post/hooks/usePostManagement';
+import { useCommentManagement } from '../features/comment/hooks/useCommentManagement';
 
 const PostsManager = () => {
   // Filters Hook
@@ -59,6 +54,25 @@ const PostsManager = () => {
     closeDetailModal: closePostDetailModal,
   } = usePostStore();
 
+  // Selected Post Comments Data
+  const { data: commentsData } = useQuery({
+    ...commentQueries.byPost({
+      postId: selectedPost?.id || 0,
+    }),
+    enabled: !!selectedPost?.id,
+  });
+  const comments = commentsData?.comments || [];
+
+  // Comment Management Hook
+  const {
+    addComment: handleAddComment,
+    updateComment: handleUpdateComment,
+    deleteComment: handleDeleteComment,
+    likeComment: handleLikeComment,
+    isCreating: isCreatingComment,
+    isUpdating: isUpdatingComment,
+  } = useCommentManagement(selectedPost, comments);
+
   // Comment Store
   const {
     selectedComment,
@@ -80,11 +94,6 @@ const PostsManager = () => {
   } = useUserStore();
 
 
-  // Comment mutations
-  const createCommentMutation = useCreateComment();
-  const updateCommentMutation = useUpdateComment();
-  const deleteCommentMutation = useDeleteComment();
-  const likeCommentMutation = useLikeComment();
 
   // === 상태 관리 === //
 
@@ -105,14 +114,6 @@ const PostsManager = () => {
   const { data: tagsData } = useQuery(tagQueries.list());
   const tags = tagsData || [];
 
-  // 선택된 게시물의 댓글 쿼리
-  const { data: commentsData } = useQuery({
-    ...commentQueries.byPost({
-      postId: selectedPost?.id || 0,
-    }),
-    enabled: !!selectedPost?.id, // selectedPost가 있을 때만 쿼리 실행
-  });
-  const comments = commentsData?.comments || [];
 
   // === 유틸리티 함수 === //
 
@@ -135,74 +136,23 @@ const PostsManager = () => {
     handleUpdatePost(postId, postData);
   };
 
-  // === 댓글 관련 함수들 === //
-
-  /**
-   * 새 댓글을 추가하는 함수
-   * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
-   */
+  // Comment CRUD actions
   const addComment = (newComment: CommentFormData) => {
-    createCommentMutation.mutate(newComment, {
-      onSuccess: () => {
-        closeCommentAddModal();
-        setNewComment({ body: '', postId: 1, userId: 1 });
-      },
+    handleAddComment(newComment, () => {
+      setNewComment({ body: '', postId: 1, userId: 1 });
     });
   };
 
-  /**
-   * 선택된 댓글을 수정하는 함수
-   * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
-   */
   const updateComment = (commentId: Comment['id'], commentData: Pick<CommentFormData, 'body'>) => {
-    if (!commentId) {
-      return;
-    }
-
-    updateCommentMutation.mutate(
-      { commentId, commentData },
-      {
-        onSuccess: () => {
-          closeCommentEditModal();
-        },
-      },
-    );
+    handleUpdateComment(commentId, commentData);
   };
 
-  /**
-   * 댓글을 삭제하는 함수
-   * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
-   */
   const deleteComment = (commentId: Comment['id']) => {
-    // 현재 선택된 게시물의 ID를 가져와야 함
-    if (!selectedPost?.id) {
-      console.error('선택된 게시물이 없습니다');
-      return;
-    }
-
-    deleteCommentMutation.mutate({
-      commentId,
-      postId: selectedPost.id,
-    });
+    handleDeleteComment(commentId);
   };
 
-  /**
-   * 댓글에 좋아요를 추가하는 함수
-   * 성공하면 쿼리 캐시가 자동으로 무효화되어 댓글 목록이 새로고침됨
-   */
   const likeComment = (commentId: Comment['id']) => {
-    const targetComment = comments.find((comment) => comment.id === commentId);
-
-    if (!targetComment || !selectedPost?.id) {
-      console.error('댓글 또는 선택된 게시물을 찾을 수 없습니다:', commentId);
-      return;
-    }
-
-    likeCommentMutation.mutate({
-      commentId,
-      likes: targetComment.likes + 1,
-      postId: selectedPost.id,
-    });
+    handleLikeComment(commentId);
   };
 
   // === UI 상호작용 함수들 === //
@@ -311,7 +261,7 @@ const PostsManager = () => {
         formData={newComment}
         onFormDataChange={setNewComment}
         onSubmit={addComment}
-        isLoading={createCommentMutation.isPending}
+        isLoading={isCreatingComment}
       />
 
       {/* 댓글 수정 대화상자 */}
@@ -321,7 +271,7 @@ const PostsManager = () => {
         comment={selectedComment}
         onCommentChange={setSelectedComment}
         onSubmit={(commentId, body) => updateComment(commentId, { body })}
-        isLoading={updateCommentMutation.isPending}
+        isLoading={isUpdatingComment}
       />
 
       {/* 게시물 상세 보기 대화상자 */}
