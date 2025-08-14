@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import { UserProfile } from '../model';
 
-export interface UserUIState {
+export interface UserState {
   selectedUser: UserProfile | null;
   modals: {
     profile: boolean;
   };
 }
 
-export interface UserUIActions {
+export interface UserActions {
   // Selection actions
   setSelectedUser: (user: UserProfile | null) => void;
   clearSelectedUser: () => void;
@@ -19,9 +19,9 @@ export interface UserUIActions {
   closeAllModals: () => void;
 }
 
-export type UserUIStore = UserUIState & UserUIActions;
+export type UserStore = UserState & UserActions;
 
-export const useUserUIStore = create<UserUIStore>((set) => ({
+export const useUserStore = create<UserStore>((set) => ({
   // State
   selectedUser: null,
   modals: {

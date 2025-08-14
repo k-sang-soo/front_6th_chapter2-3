@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Comment } from '../model';
 
-export interface CommentUIState {
+export interface CommentState {
   selectedComment: Comment | null;
   modals: {
     add: boolean;
@@ -9,7 +9,7 @@ export interface CommentUIState {
   };
 }
 
-export interface CommentUIActions {
+export interface CommentActions {
   // Selection actions
   setSelectedComment: (comment: Comment | null) => void;
   clearSelectedComment: () => void;
@@ -22,9 +22,9 @@ export interface CommentUIActions {
   closeAllModals: () => void;
 }
 
-export type CommentUIStore = CommentUIState & CommentUIActions;
+export type CommentStore = CommentState & CommentActions;
 
-export const useCommentUIStore = create<CommentUIStore>((set) => ({
+export const useCommentStore = create<CommentStore>((set) => ({
   // State
   selectedComment: null,
   modals: {
@@ -65,7 +65,7 @@ export const useCommentUIStore = create<CommentUIStore>((set) => ({
     })),
 
   closeAllModals: () =>
-    set((state) => ({
+    set(() => ({
       modals: {
         add: false,
         edit: false,

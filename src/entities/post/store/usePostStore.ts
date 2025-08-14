@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Post } from '../model';
 
-export interface PostUIState {
+export interface PostState {
   selectedPost: Post | null;
   modals: {
     add: boolean;
@@ -10,7 +10,7 @@ export interface PostUIState {
   };
 }
 
-export interface PostUIActions {
+export interface PostActions {
   // Selection actions
   setSelectedPost: (post: Post | null) => void;
   clearSelectedPost: () => void;
@@ -25,9 +25,9 @@ export interface PostUIActions {
   closeAllModals: () => void;
 }
 
-export type PostUIStore = PostUIState & PostUIActions;
+export type PostStore = PostState & PostActions;
 
-export const usePostUIStore = create<PostUIStore>((set) => ({
+export const usePostStore = create<PostStore>((set) => ({
   // State
   selectedPost: null,
   modals: {
@@ -79,7 +79,7 @@ export const usePostUIStore = create<PostUIStore>((set) => ({
     })),
 
   closeAllModals: () =>
-    set((state) => ({
+    set(() => ({
       modals: {
         add: false,
         edit: false,
