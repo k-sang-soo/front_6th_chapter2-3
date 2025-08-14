@@ -25,7 +25,7 @@ import { EditCommentForm } from '../features/comment/ui/edit-comment-form';
 import { UserProfile as UserProfileModal } from '../features/user/ui/user-profile';
 import { PostSearch } from '../features/post/ui/post-search';
 import { TagFilter } from '../features/post/ui/tag-filter';
-import { SortSelector } from '../features/post/ui/sort-selector';
+import { SortSelector, SortByType } from '../features/post/ui/sort-selector';
 import { SortOrderSelector } from '../features/post/ui/sort-order-selector';
 import { PaginationControl } from '../features/pagination/ui/pagination-control';
 import { usePostStore } from '../entities/post/store/usePostStore';
@@ -311,7 +311,7 @@ const PostsManager = () => {
               onTagChange={(tag) => updateFilters({ selectedTag: tag })}
             />
             <SortSelector
-              sortBy={filters.sortBy as any}
+              sortBy={filters.sortBy as SortByType}
               onSortChange={(sortBy) => updateFilters({ sortBy })}
             />
             <SortOrderSelector
