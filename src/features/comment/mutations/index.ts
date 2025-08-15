@@ -1,5 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createComment, updateComment, deleteComment, likeComment } from '../../../entities/comment/api';
+import {
+  createComment,
+  updateComment,
+  deleteComment,
+  likeComment,
+} from '../../../entities/comment/api';
 import { CommentFormData } from '../../../entities/comment/model';
 import { commentQueries } from '../../../entities/comment/queries';
 import type { CommentsResponse } from '../../../entities/comment/model';
@@ -13,7 +18,7 @@ export const useCreateComment = () => {
 
   return useMutation({
     mutationFn: (commentData: CommentFormData) => createComment(commentData),
-    
+
     // ✅ API 호출 성공 시 서버 응답을 캐시에 즉시 추가
     onSuccess: (data, variables) => {
       // 서버에서 반환된 새 댓글을 캐시에 추가 (likes 기본값 설정)
@@ -21,48 +26,58 @@ export const useCreateComment = () => {
         ...data,
         likes: 0, // 새로 생성된 댓글의 likes는 0으로 설정
       };
-      
-      queryClient.setQueryData(commentQueries.byPostKey(variables.postId), (old: CommentsResponse | undefined) => {
-        if (!old) return { comments: [commentWithDefaults], total: 1, skip: 0, limit: 30 };
-        return {
-          ...old,
-          comments: [...(old.comments || []), commentWithDefaults],
-        };
-      });
+
+      queryClient.setQueryData(
+        commentQueries.byPostKey(variables.postId),
+        (old: CommentsResponse | undefined) => {
+          if (!old) return { comments: [commentWithDefaults], total: 1, skip: 0, limit: 30 };
+          return {
+            ...old,
+            comments: [...(old.comments || []), commentWithDefaults],
+          };
+        },
+      );
       console.log(`댓글 ${data.id} 생성 완료`);
     },
-    
+
     onError: (error) => {
       console.error('댓글 생성 실패:', error);
-    }
+    },
   });
 };
 
 /**
- * 댓글 수정 Mutation (Optimistic Update)  
+ * 댓글 수정 Mutation (Optimistic Update)
  * API 호출 성공 시 서버 응답 데이터로 캐시 업데이트
  */
 export const useUpdateComment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ commentId, commentData }: { commentId: number; commentData: Pick<CommentFormData, 'body'> }) => 
-      updateComment(commentId, commentData),
-    
+    mutationFn: ({
+      commentId,
+      commentData,
+    }: {
+      commentId: number;
+      commentData: Pick<CommentFormData, 'body'>;
+    }) => updateComment(commentId, commentData),
+
     // ✅ API 호출 성공 시 서버 응답으로 캐시의 해당 댓글 업데이트
     onSuccess: (data) => {
-      queryClient.setQueryData(commentQueries.byPostKey(data.postId), (old: CommentsResponse | undefined) => {
-        if (!old) return old;
-        return {
-          ...old,
-          comments: old.comments?.map((comment) =>
-            comment.id === data.id ? data : comment
-          ) || [],
-        };
-      });
+      queryClient.setQueryData(
+        commentQueries.byPostKey(data.postId),
+        (old: CommentsResponse | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            comments:
+              old.comments?.map((comment) => (comment.id === data.id ? data : comment)) || [],
+          };
+        },
+      );
       console.log(`댓글 ${data.id} 수정 완료`);
     },
-    
+
     onError: (error) => {
       console.error('댓글 수정 실패:', error);
     },
@@ -78,42 +93,48 @@ export const useDeleteComment = () => {
 
   return useMutation({
     mutationFn: ({ commentId }: { commentId: number; postId: number }) => deleteComment(commentId),
-    
+
     // 🚀 API 호출 전에 즉시 UI 업데이트 (Optimistic Update)
     onMutate: async ({ commentId, postId }) => {
       // 진행 중인 관련 쿼리들을 취소하여 충돌 방지
       await queryClient.cancelQueries({ queryKey: commentQueries.byPostKey(postId) });
-      
+
       // 현재 캐시 데이터를 백업 (롤백용)
       const previousComments = queryClient.getQueryData(commentQueries.byPostKey(postId));
-      
+
       // 캐시에서 즉시 댓글 제거
-      queryClient.setQueryData(commentQueries.byPostKey(postId), (old: CommentsResponse | undefined) => {
-        if (!old) return old;
-        return {
-          ...old,
-          comments: old.comments?.filter((comment) => comment.id !== commentId) || []
-        };
-      });
-      
+      queryClient.setQueryData(
+        commentQueries.byPostKey(postId),
+        (old: CommentsResponse | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            comments: old.comments?.filter((comment) => comment.id !== commentId) || [],
+          };
+        },
+      );
+
       // 롤백용 컨텍스트 반환
       return { previousComments, postId };
     },
-    
+
     // ❌ API 호출 실패 시 롤백
     onError: (error, variables, context) => {
       console.error('댓글 삭제 실패:', error);
-      
+
       if (context?.previousComments) {
         // 이전 상태로 복원
-        queryClient.setQueryData(commentQueries.byPostKey(variables.postId), context.previousComments);
+        queryClient.setQueryData(
+          commentQueries.byPostKey(variables.postId),
+          context.previousComments,
+        );
       }
     },
-    
+
     // ✅ API 호출 성공 시 (이미 UI는 업데이트됨)
     onSuccess: (_, variables) => {
       console.log(`댓글 ${variables.commentId} 삭제 완료`);
-    }
+    },
   });
 };
 
@@ -125,74 +146,61 @@ export const useLikeComment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ commentId, likes }: { commentId: number; likes: number; postId: number }) => {
-      console.log(`🔵 [LIKE] API 호출 시작 - commentId: ${commentId}, likes: ${likes}`);
-      return likeComment(commentId, { likes });
-    },
-    
+    mutationFn: ({ commentId, likes }: { commentId: number; likes: number; postId: number }) =>
+      likeComment(commentId, { likes }),
+
     // 🚀 API 호출 전에 즉시 UI 업데이트 (Optimistic Update)
     onMutate: async ({ commentId, likes, postId }) => {
-      console.log(`🟡 [LIKE] onMutate 시작 - commentId: ${commentId}, 새로운 likes: ${likes}`);
-      
       // 진행 중인 관련 쿼리들을 취소하여 충돌 방지
       await queryClient.cancelQueries({ queryKey: commentQueries.byPostKey(postId) });
-      
+
       // 현재 캐시 데이터를 백업 (롤백용)
-      const previousComments = queryClient.getQueryData(commentQueries.byPostKey(postId)) as CommentsResponse | undefined;
-      
-      // 이전 likes 값 확인
-      const previousComment = previousComments?.comments?.find(c => c.id === commentId);
-      console.log(`🟡 [LIKE] 이전 likes 값: ${previousComment?.likes} → 새로운 값: ${likes}`);
-      
+      const previousComments = queryClient.getQueryData(commentQueries.byPostKey(postId)) as
+        | CommentsResponse
+        | undefined;
+
       // 캐시에서 즉시 좋아요 수 업데이트
-      queryClient.setQueryData(commentQueries.byPostKey(postId), (old: CommentsResponse | undefined) => {
-        if (!old) return old;
-        const updated = {
-          ...old,
-          comments: old.comments?.map((comment) =>
-            comment.id === commentId 
-              ? { ...comment, likes } // 새로운 좋아요 수로 즉시 업데이트
-              : comment
-          ) || [],
-        };
-        
-        const updatedComment = updated.comments?.find(c => c.id === commentId);
-        console.log(`🟡 [LIKE] 캐시 업데이트 완료 - commentId: ${commentId}, 업데이트된 likes: ${updatedComment?.likes}`);
-        
-        return updated;
-      });
-      
+      queryClient.setQueryData(
+        commentQueries.byPostKey(postId),
+        (old: CommentsResponse | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            comments:
+              old.comments?.map((comment) =>
+                comment.id === commentId
+                  ? { ...comment, likes } // 새로운 좋아요 수로 즉시 업데이트
+                  : comment,
+              ) || [],
+          };
+        },
+      );
+
       // 롤백용 컨텍스트 반환
       return { previousComments, postId };
     },
-    
+
     // ❌ API 호출 실패 시 롤백
     onError: (error, variables, context) => {
-      console.error(`🔴 [LIKE] API 호출 실패 - commentId: ${variables.commentId}`, error);
-      
+      console.error('댓글 좋아요 실패:', error);
+
       // 404 에러(새로 생성된 댓글)인 경우 롤백하지 않고 Optimistic Update 유지
-      if (error.response?.status === 404) {
-        console.log(`🟡 [LIKE] 새로운 댓글이므로 로컬 상태 유지 - commentId: ${variables.commentId}`);
+      if ((error as any).response?.status === 404) {
         return; // 롤백하지 않음
       }
-      
+
       // 다른 에러인 경우에만 롤백
       if (context?.previousComments) {
-        queryClient.setQueryData(commentQueries.byPostKey(variables.postId), context.previousComments);
-        console.log(`🔴 [LIKE] 롤백 완료 - commentId: ${variables.commentId}`);
+        queryClient.setQueryData(
+          commentQueries.byPostKey(variables.postId),
+          context.previousComments,
+        );
       }
     },
-    
+
     // ✅ API 호출 성공 시 (Optimistic Update 결과 유지)
-    onSuccess: (data, variables) => {
-      console.log(`🟢 [LIKE] API 호출 성공 - commentId: ${variables.commentId}`, data);
-      
-      // 현재 캐시 상태 확인
-      const currentCache = queryClient.getQueryData(commentQueries.byPostKey(variables.postId)) as CommentsResponse | undefined;
-      const currentComment = currentCache?.comments?.find(c => c.id === variables.commentId);
-      console.log(`🟢 [LIKE] 성공 후 캐시 상태 - commentId: ${variables.commentId}, 현재 likes: ${currentComment?.likes}`);
-      
+    onSuccess: () => {
       // dummyjson.com은 모의 API이므로 Optimistic Update 결과를 그대로 유지
-    }
+    },
   });
 };

@@ -13,7 +13,7 @@ export const useCreatePost = () => {
   return useMutation({
     mutationFn: (postData: PostFormData) => createPost(postData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: postQueries.allKey() });
+      queryClient.invalidateQueries({ queryKey: postQueries.withAuthorsKey() });
     },
     onError: (error) => {
       console.error('게시물 생성 실패:', error);
@@ -32,7 +32,7 @@ export const useUpdatePost = () => {
     mutationFn: ({ postId, postData }: { postId: number; postData: PostFormData }) =>
       updatePost(postId, postData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: postQueries.allKey() });
+      queryClient.invalidateQueries({ queryKey: postQueries.withAuthorsKey() });
     },
     onError: (error) => {
       console.error('게시물 수정 실패:', error);
@@ -50,7 +50,7 @@ export const useDeletePost = () => {
   return useMutation({
     mutationFn: (postId: number) => deletePost(postId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: postQueries.allKey() });
+      queryClient.invalidateQueries({ queryKey: postQueries.withAuthorsKey() });
     },
     onError: (error) => {
       console.error('게시물 삭제 실패:', error);
