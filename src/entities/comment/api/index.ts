@@ -1,5 +1,5 @@
 import { CommentRequest, CommentFormData, CommentLikeRequest } from '../model';
-import { axiosInstance } from '../../../app/libs/axiosInstance.old.ts';
+import { axiosInstance } from '../../../app/libs/axiosInstance';
 import type { CommentsResponse } from '../model';
 
 // 특정 게시물의 댓글 조회
@@ -15,7 +15,10 @@ export const createComment = async (commentData: CommentFormData) => {
 };
 
 // 댓글 수정
-export const updateComment = async (commentId: number, commentData: Pick<CommentFormData, 'body'>) => {
+export const updateComment = async (
+  commentId: number,
+  commentData: Pick<CommentFormData, 'body'>,
+) => {
   const response = await axiosInstance.put(`/comments/${commentId}`, commentData);
   return response.data;
 };

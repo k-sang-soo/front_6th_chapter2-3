@@ -1,5 +1,5 @@
 import { PostRequest, PostsResponse, PostFormData } from '../model';
-import { axiosInstance } from '../../../app/libs/axiosInstance.old.ts';
+import { axiosInstance } from '../../../app/libs/axiosInstance';
 import { UsersResponse } from '../../user/model';
 
 export const getPosts = async ({ 

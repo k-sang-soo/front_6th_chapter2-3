@@ -1,4 +1,4 @@
-import { axiosInstance } from '../../../app/libs/axiosInstance.old';
+import { axiosInstance } from '../../../app/libs/axiosInstance';
 import type { UsersResponse, UserProfile } from '../model';
 
 // 모든 사용자 목록 조회 (username, image만 select)

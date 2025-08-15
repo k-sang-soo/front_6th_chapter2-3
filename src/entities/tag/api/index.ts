@@ -1,4 +1,4 @@
-import { axiosInstance } from '../../../app/libs/axiosInstance.old';
+import { axiosInstance } from '../../../app/libs/axiosInstance';
 import type { Tag } from '../model';
 
 // 모든 태그 목록 조회
