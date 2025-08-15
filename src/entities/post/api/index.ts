@@ -34,9 +34,21 @@ export const getPostsWithAuthors = async (params: PostRequest) => {
     author: usersData.users.find((user) => user.id === post.userId),
   }));
 
+  // 클라이언트 사이드 검색 필터링 (dummyjson.com API가 검색을 제대로 지원하지 않음)
+  let filteredPosts = postsWithAuthors;
+  
+  // 검색어가 있을 때만 필터링 수행
+  if (params.searchQuery && params.searchQuery.trim() !== '') {
+    const searchLower = params.searchQuery.toLowerCase().trim();
+    filteredPosts = postsWithAuthors.filter((post) => 
+      post.title.toLowerCase().includes(searchLower) || 
+      post.body.toLowerCase().includes(searchLower)
+    );
+  }
+
   return {
-    posts: postsWithAuthors,
-    total: postsData.total,
+    posts: filteredPosts,
+    total: filteredPosts.length, // 필터링된 결과의 총 개수
   };
 };
 
