@@ -12,7 +12,7 @@ export const useCreatePost = () => {
 
   return useMutation({
     mutationFn: (postData: PostFormData) => createPost(postData),
-    onSuccess: (data, variables) => {
+    onSuccess: (data) => {
       // 현재 캐시된 쿼리들을 찾아서 새 게시물 추가
       queryClient.setQueriesData(
         { queryKey: postQueries.withAuthorsKey(), exact: false },

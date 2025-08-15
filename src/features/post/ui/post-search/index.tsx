@@ -17,7 +17,7 @@ export const PostSearch = ({
 }: PostSearchProps) => {
   // 로컬 상태로 즉시 UI 업데이트
   const [inputValue, setInputValue] = useState(searchQuery);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // input 변경 핸들러 - 디바운스 로직 포함
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
