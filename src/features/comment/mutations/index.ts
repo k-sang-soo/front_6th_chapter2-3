@@ -16,12 +16,17 @@ export const useCreateComment = () => {
     
     // ✅ API 호출 성공 시 서버 응답을 캐시에 즉시 추가
     onSuccess: (data, variables) => {
-      // 서버에서 반환된 새 댓글을 캐시에 추가
+      // 서버에서 반환된 새 댓글을 캐시에 추가 (likes 기본값 설정)
+      const commentWithDefaults = {
+        ...data,
+        likes: 0, // 새로 생성된 댓글의 likes는 0으로 설정
+      };
+      
       queryClient.setQueryData(commentQueries.byPostKey(variables.postId), (old: CommentsResponse | undefined) => {
-        if (!old) return { comments: [data], total: 1, skip: 0, limit: 30 };
+        if (!old) return { comments: [commentWithDefaults], total: 1, skip: 0, limit: 30 };
         return {
           ...old,
-          comments: [...(old.comments || []), data],
+          comments: [...(old.comments || []), commentWithDefaults],
         };
       });
       console.log(`댓글 ${data.id} 생성 완료`);
@@ -120,21 +125,29 @@ export const useLikeComment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ commentId, likes }: { commentId: number; likes: number; postId: number }) => 
-      likeComment(commentId, { likes }),
+    mutationFn: ({ commentId, likes }: { commentId: number; likes: number; postId: number }) => {
+      console.log(`🔵 [LIKE] API 호출 시작 - commentId: ${commentId}, likes: ${likes}`);
+      return likeComment(commentId, { likes });
+    },
     
     // 🚀 API 호출 전에 즉시 UI 업데이트 (Optimistic Update)
     onMutate: async ({ commentId, likes, postId }) => {
+      console.log(`🟡 [LIKE] onMutate 시작 - commentId: ${commentId}, 새로운 likes: ${likes}`);
+      
       // 진행 중인 관련 쿼리들을 취소하여 충돌 방지
       await queryClient.cancelQueries({ queryKey: commentQueries.byPostKey(postId) });
       
       // 현재 캐시 데이터를 백업 (롤백용)
-      const previousComments = queryClient.getQueryData(commentQueries.byPostKey(postId));
+      const previousComments = queryClient.getQueryData(commentQueries.byPostKey(postId)) as CommentsResponse | undefined;
+      
+      // 이전 likes 값 확인
+      const previousComment = previousComments?.comments?.find(c => c.id === commentId);
+      console.log(`🟡 [LIKE] 이전 likes 값: ${previousComment?.likes} → 새로운 값: ${likes}`);
       
       // 캐시에서 즉시 좋아요 수 업데이트
       queryClient.setQueryData(commentQueries.byPostKey(postId), (old: CommentsResponse | undefined) => {
         if (!old) return old;
-        return {
+        const updated = {
           ...old,
           comments: old.comments?.map((comment) =>
             comment.id === commentId 
@@ -142,6 +155,11 @@ export const useLikeComment = () => {
               : comment
           ) || [],
         };
+        
+        const updatedComment = updated.comments?.find(c => c.id === commentId);
+        console.log(`🟡 [LIKE] 캐시 업데이트 완료 - commentId: ${commentId}, 업데이트된 likes: ${updatedComment?.likes}`);
+        
+        return updated;
       });
       
       // 롤백용 컨텍스트 반환
@@ -150,17 +168,31 @@ export const useLikeComment = () => {
     
     // ❌ API 호출 실패 시 롤백
     onError: (error, variables, context) => {
-      console.error('댓글 좋아요 실패:', error);
+      console.error(`🔴 [LIKE] API 호출 실패 - commentId: ${variables.commentId}`, error);
       
+      // 404 에러(새로 생성된 댓글)인 경우 롤백하지 않고 Optimistic Update 유지
+      if (error.response?.status === 404) {
+        console.log(`🟡 [LIKE] 새로운 댓글이므로 로컬 상태 유지 - commentId: ${variables.commentId}`);
+        return; // 롤백하지 않음
+      }
+      
+      // 다른 에러인 경우에만 롤백
       if (context?.previousComments) {
-        // 이전 상태로 복원
         queryClient.setQueryData(commentQueries.byPostKey(variables.postId), context.previousComments);
+        console.log(`🔴 [LIKE] 롤백 완료 - commentId: ${variables.commentId}`);
       }
     },
     
-    // ✅ API 호출 성공 시 (이미 UI는 업데이트됨)
-    onSuccess: (_, variables) => {
-      console.log(`댓글 ${variables.commentId} 좋아요 업데이트 완료: ${variables.likes}개`);
+    // ✅ API 호출 성공 시 (Optimistic Update 결과 유지)
+    onSuccess: (data, variables) => {
+      console.log(`🟢 [LIKE] API 호출 성공 - commentId: ${variables.commentId}`, data);
+      
+      // 현재 캐시 상태 확인
+      const currentCache = queryClient.getQueryData(commentQueries.byPostKey(variables.postId)) as CommentsResponse | undefined;
+      const currentComment = currentCache?.comments?.find(c => c.id === variables.commentId);
+      console.log(`🟢 [LIKE] 성공 후 캐시 상태 - commentId: ${variables.commentId}, 현재 likes: ${currentComment?.likes}`);
+      
+      // dummyjson.com은 모의 API이므로 Optimistic Update 결과를 그대로 유지
     }
   });
 };

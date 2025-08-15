@@ -67,6 +67,8 @@ export const useCommentManagement = (selectedPost: Post | null, comments: Commen
       return;
     }
 
+    console.log(`🎯 [LIKE] 좋아요 클릭 - commentId: ${commentId}, 현재 likes: ${targetComment.likes}, 새로운 likes: ${targetComment.likes + 1}`);
+
     likeCommentMutation.mutate({
       commentId,
       likes: targetComment.likes + 1,
