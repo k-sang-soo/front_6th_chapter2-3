@@ -11,7 +11,7 @@ import {
 import { Edit2, MessageSquare, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
 import { Post, PostWithAuthor, PostRequest } from '../../../../entities/post/model';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, memo } from 'react';
 import { postQueries } from '../../../../entities/post/queries';
 
 interface PostTableContainerProps {
@@ -25,7 +25,7 @@ interface PostTableContainerProps {
   onTotalChange: (total: number) => void;
 }
 
-export const PostTableContainer = ({
+const PostTableContainerComponent = ({
   filters,
   onTagSelect,
   onUserModalOpen,
@@ -130,3 +130,6 @@ export const PostTableContainer = ({
     </Table>
   );
 };
+
+// 메모이제이션으로 불필요한 리렌더링 방지
+export const PostTableContainer = memo(PostTableContainerComponent);
